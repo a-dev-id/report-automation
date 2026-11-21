@@ -80,15 +80,18 @@ final class FakeData
             $values,
         );
 
+        // Engagement differs per country on purpose, so ranking by engaged sessions differs from ranking by sessions.
+        $engagement = ['Indonesia' => 0.50, 'Australia' => 0.80, 'United States' => 0.70, 'United Kingdom' => 0.30, 'Germany' => 0.10, 'France' => 0.40,
+            'Singapore' => 0.60, 'Netherlands' => 0.50, 'Canada' => 0.20, 'India' => 0.50, 'Japan' => 0.55, 'Brazil' => 0.40];
         $countries = fn (array $values) => array_map(
-            fn ($name, $sessions) => $r(['country' => $name], ['sessions' => $sessions]),
+            fn ($name, $sessions) => $r(['country' => $name], ['sessions' => $sessions, 'engagedSessions' => $sessions * ($engagement[$name] ?? 0.5)]),
             array_keys($values),
             $values,
         );
 
         $perf = fn (string $country, string $campaign, string $sourceMedium, array $m) => $r(
             ['country' => $country, 'sessionCampaignName' => $campaign, 'sessionSourceMedium' => $sourceMedium],
-            $m + ['engagementRate' => 0.5],
+            $m + ['engagementRate' => 0.5, 'engagedSessions' => round($m['sessions'] * ($m['engagementRate'] ?? 0.5), 1)],
         );
         $perfKey = fn (string $country, string $campaign, string $sourceMedium, float $events, float $sessions) => $r(
             ['country' => $country, 'sessionCampaignName' => $campaign, 'sessionSourceMedium' => $sourceMedium],
@@ -204,7 +207,7 @@ final class FakeData
      */
     private static function scale(array $fixture, int $factor): array
     {
-        $countKeys = ['sessions', 'totalUsers', 'ecommercePurchases', 'purchaseRevenue', 'totalPurchasers', 'keyEvents', 'eventCount',
+        $countKeys = ['sessions', 'totalUsers', 'ecommercePurchases', 'purchaseRevenue', 'totalPurchasers', 'keyEvents', 'engagedSessions', 'eventCount',
             'advertiserAdImpressions', 'advertiserAdClicks', 'advertiserAdCost', 'clicks', 'impressions'];
 
         $walk = function (mixed $node) use (&$walk, $countKeys, $factor): mixed {

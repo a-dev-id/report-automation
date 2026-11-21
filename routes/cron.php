@@ -17,3 +17,6 @@ Route::post('monthly-report', [CronController::class, 'monthlyReport']);
 Route::post('queue-work', [CronController::class, 'queueWork']);
 Route::post('retry-failed', [CronController::class, 'retryFailed']);
 Route::get('health', [CronController::class, 'health']);
+
+// MANUAL USE ONLY, not for the crontab: sends one "[TEST] " report email to the single address in the body.
+Route::post('send-test', [CronController::class, 'sendTest']);

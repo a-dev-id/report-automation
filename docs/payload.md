@@ -63,8 +63,10 @@ channels
     averageSessionDuration   metric, seconds ('Other' is the sessions-weighted average of the rest)
     engagementRate           metric, fraction ('Other' is the sessions-weighted average of the rest)
 
-countries
+countries                 ranked by ENGAGED sessions (GA4 engagedSessions), highest first
   total.sessions        metric (sum of all country rows, per range)
+  largestBySessions     {country, sessions}: the largest country by sessions over ALL countries, "(not set)" excluded (null if none)
+  engagedLeader         {country, engagedSessions}: the country with the most engaged sessions over all countries (null if none)
   sessionsSum           sum of the country rows, current period
   sessionsTotal         site.sessions.current, the real total for the same period (null if unknown)
   warning               true when sessionsSum exceeds sessionsTotal by more than quality_alerts.country_sum_tolerance_percent
@@ -72,12 +74,14 @@ countries
                         the rows add up to more than the real total. The rows themselves are never adjusted.
   rows[]                top 8 (monthly: 10), then "Other"
     country, isOther, sessions (metric)
+    engagedSessions     metric: GA4 engagedSessions (sessions with engagement). The ranking key; 'Other' is the sum of the rest
     share               {current, previous, yearAgo?}   percent of all sessions in that range
     shareChange         {previous: {points, direction}, yearAgo?: {points, direction}}   percentage points
 
-country_performance[]   current period, top 10 by sessions
+country_performance[]   current period, top 10 by ENGAGED sessions
   country, campaign, sourceMedium
   users, sessions, averageSessionDuration, engagementRate (fraction), purchasers, purchaseRevenue
+  engagedSessions       GA4 engagedSessions for the row (sessions x engagementRate if GA4 did not return it)
   previousSessions      sessions of the same country + campaign + source in the previous period (0 if none)
   sessionsChange        Compare::change(sessions, previousSessions): {difference, percent, direction, improved}
                         (direction "new" when it had no sessions before). Compared with the previous period only,

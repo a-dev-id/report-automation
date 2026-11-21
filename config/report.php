@@ -119,13 +119,21 @@ return [
     |--------------------------------------------------------------------------
     |   min_channel_sessions : a channel needs at least this many sessions (current + previous) to be named
     |                          as the best or worst movement. Keeps tiny channels out of the headline.
-    |   min_country_sessions : a country needs at least this many sessions to be named as the top quality country.
+    |   min_country_sessions : the "best traffic quality" country needs at least this many sessions...
+    |   min_country_rate_percent : ...and a booking-engine rate or a purchase rate above this percent. If the winner
+    |                          does not meet both, the sentence is left out.
     |   max_bullets          : bullets under the headline (the insight has 3 to 5).
+    |   large_drop_percent / large_rise_percent : a metric that moved by more than this versus its comparison period is
+    |                          not stated as a fact in the headline. The insight adds a neutral note to check the tracking
+    |                          setup instead (a change that large is often a tracking change). The KPI tile still shows the real number.
     */
     'insights' => [
         'min_channel_sessions' => 50,
-        'min_country_sessions' => 100,
+        'min_country_sessions' => 50,
+        'min_country_rate_percent' => 1.0,
         'max_bullets' => 5,
+        'large_drop_percent' => 60,
+        'large_rise_percent' => 200,
     ],
 
     /*

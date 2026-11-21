@@ -120,23 +120,59 @@ class SectionsTest extends TestCase
         $this->assertSame(2800.0, $channels['rows'][0]['totalUsers']['current']);
     }
 
-    public function test_countries_weekly_top_eight_with_share_in_points(): void
+    public function test_countries_are_ranked_by_engaged_sessions_with_share_in_points(): void
     {
         $countries = (new TrafficByCountry($this->ga4))->fetch(FakeData::nandini(), $this->period(ReportType::Weekly));
 
-        $this->assertCount(9, $countries['rows']);
-        $this->assertSame('Netherlands', $countries['rows'][7]['country']);     // ties with Canada on 350, higher previous wins
-        $other = $countries['rows'][8];
-        $this->assertSame('Other', $other['country']);
-        $this->assertSame(1150.0, $other['sessions']['current']);               // Canada, India, Japan, Brazil
+        // Ranked by engaged sessions (sessions x engagement), not by sessions: Germany has 700 sessions but 10% engagement.
+        $this->assertSame(
+            ['Indonesia', 'Australia', 'United States', 'United Kingdom', 'Singapore', 'France', 'Netherlands', 'India', 'Other'],
+            array_column($countries['rows'], 'country'),
+        );
+        $engaged = array_column(array_map(fn ($r) => ['e' => $r['engagedSessions']['current']], $countries['rows']), 'e');
+        $this->assertSame([1500.0, 1440.0, 840.0, 270.0, 240.0, 200.0, 175.0, 150.0], array_slice($engaged, 0, 8));
 
+        $other = $countries['rows'][8];
+        $this->assertTrue($other['isOther']);
+        $this->assertSame(1550.0, $other['sessions']['current']);               // Germany, Canada, Japan, Brazil
+        $this->assertSame(377.5, $other['engagedSessions']['current']);
+
+        // Sessions are still there, and the share is still a share of sessions.
         $indonesia = $countries['rows'][0];
+        $this->assertSame(3000.0, $indonesia['sessions']['current']);
+        $this->assertSame(1500.0, $indonesia['engagedSessions']['current']);
+        $this->assertSame(1300.0, $indonesia['engagedSessions']['previous']);
+        $this->assertSame(15.4, $indonesia['engagedSessions']['change']['percent']);
         $this->assertSame(30.0, $indonesia['share']['current']);
         $this->assertSame(32.5, $indonesia['share']['previous']);
         $this->assertSame(['points' => -2.5, 'direction' => 'down'], $indonesia['shareChange']['previous']);
         $this->assertArrayNotHasKey('yearAgo', $indonesia['share']);
+        $this->assertArrayNotHasKey('yearAgo', $indonesia['engagedSessions']);
 
         $this->assertEqualsWithDelta(100.0, array_sum(array_map(fn ($r) => $r['share']['current'], $countries['rows'])), 0.1);
+
+        // The largest and the engaged leader are over all countries: Indonesia leads both in the fixture.
+        $this->assertSame(['country' => 'Indonesia', 'sessions' => 3000.0], $countries['largestBySessions']);
+        $this->assertSame(['country' => 'Indonesia', 'engagedSessions' => 1500.0], $countries['engagedLeader']);
+
+        $request = $this->ga4->reportsFor(FakeData::NANDINI_ID, 'countries')[0];
+        $this->assertSame(['sessions', 'engagedSessions'], $request->metrics);
+        $this->assertSame([['field' => 'engagedSessions', 'metric' => true, 'desc' => true]], $request->orderBys);
+    }
+    public function test_the_largest_country_is_found_even_when_it_is_not_among_the_top_rows_and_not_set_is_ignored(): void
+    {
+        $row = fn (string $country, float $sessions, float $engaged) => ['dimensions' => ['country' => $country], 'metrics' => ['sessions' => $sessions, 'engagedSessions' => $engaged]];
+        $ga4 = new FakeGa4Client([FakeData::NANDINI_ID => ['countries' => ['current' => array_merge(
+            [$row('(not set)', 90000.0, 99000.0)],
+            array_map(fn ($i) => $row("Engaged{$i}", 100.0, 90.0 - $i), range(1, 9)),   // nine small, very engaged countries
+            [$row('Bigland', 5000.0, 10.0)],                                              // huge, barely engaged: ranks last
+        )]]]);
+
+        $countries = (new TrafficByCountry($ga4))->fetch(FakeData::nandini(), $this->period(ReportType::Weekly));
+
+        $this->assertNotContains('Bigland', array_column($countries['rows'], 'country'));   // not shown: it is in "Other"
+        $this->assertSame(['country' => 'Bigland', 'sessions' => 5000.0], $countries['largestBySessions']);
+        $this->assertSame('Engaged1', $countries['engagedLeader']['country']);
     }
 
     public function test_countries_report_the_sum_the_site_total_and_a_warning(): void
@@ -165,13 +201,61 @@ class SectionsTest extends TestCase
         $countries = (new TrafficByCountry($this->ga4))->fetch(FakeData::nandini(), $this->period(ReportType::Monthly));
 
         $this->assertCount(11, $countries['rows']);
-        $this->assertSame(500.0, $countries['rows'][10]['sessions']['current']);  // Japan + Brazil
+        $this->assertSame(['India', 'Japan', 'Brazil', 'Other'], array_column(array_slice($countries['rows'], 7), 'country'));
+        $this->assertSame(1050.0, $countries['rows'][10]['sessions']['current']);  // Germany + Canada
         $this->assertSame(40.0, $countries['rows'][0]['share']['yearAgo']);
         $this->assertSame(['points' => -10.0, 'direction' => 'down'], $countries['rows'][0]['shareChange']['yearAgo']);
-        // Canada did not exist a year ago: share is 0, not missing.
+        $this->assertSame(1000.0, $countries['rows'][0]['engagedSessions']['yearAgo']);
+        // Japan had no sessions a year ago: share is 0, not missing.
+        $this->assertSame('Japan', $countries['rows'][8]['country']);
         $this->assertSame(0.0, $countries['rows'][8]['share']['yearAgo']);
     }
 
+    public function test_country_performance_computes_engaged_sessions_when_ga4_does_not_return_them(): void
+    {
+        $row = fn (string $country, array $metrics) => ['dimensions' => ['country' => $country, 'sessionCampaignName' => '(not set)', 'sessionSourceMedium' => 'google / organic'], 'metrics' => $metrics];
+        $ga4 = new FakeGa4Client([FakeData::NANDINI_ID => ['country_performance' => ['current' => [
+            $row('Indonesia', ['sessions' => 200.0, 'engagementRate' => 0.25, 'averageSessionDuration' => 30.0, 'totalUsers' => 150.0]),   // no engagedSessions
+            $row('Australia', ['sessions' => 100.0, 'engagementRate' => 0.8, 'engagedSessions' => 77.0, 'averageSessionDuration' => 60.0, 'totalUsers' => 90.0]),
+        ]]]]);
+
+        $rows = (new CountryPerformance($ga4))->fetch(FakeData::nandini(), $this->period(ReportType::Weekly));
+        $by = array_column($rows, null, 'country');
+
+        $this->assertSame(50.0, $by['Indonesia']['engagedSessions']);   // 200 x 0.25, computed
+        $this->assertSame(77.0, $by['Australia']['engagedSessions']);   // GA4's own figure wins over sessions x rate (80)
+    }
+
+    public function test_country_performance_is_ranked_by_engaged_sessions(): void
+    {
+        $fixtures = FakeData::ga4();
+        foreach ($fixtures[FakeData::NANDINI_ID]['country_performance']['current'] as &$row) {
+            if ($row['dimensions']['country'] === 'Singapore') {
+                $row['metrics']['engagedSessions'] = 5000.0;   // Singapore: few sessions, very engaged
+            }
+        }
+        unset($row);
+        $ga4 = new FakeGa4Client($fixtures);
+
+        $rows = (new CountryPerformance($ga4))->fetch(FakeData::nandini(), $this->period(ReportType::Weekly));
+
+        $this->assertSame('Singapore', $rows[0]['country']);
+        $this->assertSame(5000.0, $rows[0]['engagedSessions']);
+        $this->assertSame(400.0, $rows[0]['sessions']);                    // the Sessions column keeps the sessions
+        $by = array_column($rows, null, 'country');
+        $this->assertSame(1500.0, $by['Indonesia']['engagedSessions']);   // 3000 sessions x 0.5 engagement
+        $this->assertCount(10, $rows);
+        $engaged = array_column($rows, 'engagedSessions');
+        $sorted = $engaged;
+        rsort($sorted);
+        $this->assertSame($sorted, $engaged);                              // descending
+
+        $request = $ga4->reportsFor(FakeData::NANDINI_ID, 'country_performance')[0];
+        $this->assertContains('engagedSessions', $request->metrics);
+        $this->assertSame([['field' => 'engagedSessions', 'metric' => true, 'desc' => true]], $request->orderBys);
+        $this->assertSame('High Value', $by['Australia']['quality']);      // the label and the bot flag are untouched
+        $this->assertTrue($by['Germany']['checkForBots']);
+    }
     public function test_bot_flag_needs_no_booking_visits_no_purchasers_enough_sessions_and_a_short_session(): void
     {
         $bots = fn (float $sessions, float $duration, ?float $visits, float $buyers) => CountryPerformance::looksLikeBots($sessions, $duration, $visits, $buyers);

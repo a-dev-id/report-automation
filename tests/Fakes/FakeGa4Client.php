@@ -70,7 +70,14 @@ final class FakeGa4Client implements Ga4Client
         $fixture = $this->fixtures[$id][$report->label] ?? [];
         $result = [];
         foreach (array_keys($report->dateRanges) as $range) {
-            $result[$range] = array_slice($fixture[$range] ?? [], 0, $report->limit);
+            $rows = $fixture[$range] ?? [];
+            // GA4 returns rows in the requested order (before the limit is applied).
+            foreach (array_reverse($report->orderBys) as $order) {
+                usort($rows, fn (array $a, array $b) => $order['desc']
+                    ? ($b[$order['metric'] ? 'metrics' : 'dimensions'][$order['field']] ?? 0) <=> ($a[$order['metric'] ? 'metrics' : 'dimensions'][$order['field']] ?? 0)
+                    : ($a[$order['metric'] ? 'metrics' : 'dimensions'][$order['field']] ?? 0) <=> ($b[$order['metric'] ? 'metrics' : 'dimensions'][$order['field']] ?? 0));
+            }
+            $result[$range] = array_slice($rows, 0, $report->limit);
         }
 
         return $result;

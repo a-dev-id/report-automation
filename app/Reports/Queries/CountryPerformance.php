@@ -13,7 +13,7 @@ use App\Support\Ga4Report;
 use App\Support\ReportPeriod;
 
 /**
- * Country x campaign x source/medium rows for the current period, top 10 by sessions. Only sessions are
+ * Country x campaign x source/medium rows for the current period, top 10 by ENGAGED sessions. Only sessions are
  * compared with the previous period (one extra, sessions-only query matched by country, campaign and source).
  *
  * bookingEngineEvents comes from a second query under the property's booking engine filter and is
@@ -22,6 +22,7 @@ use App\Support\ReportPeriod;
  *
  * Output: list of [
  *   'country', 'campaign', 'sourceMedium', 'users', 'sessions', 'previousSessions', 'sessionsChange' (Compare::change),
+ *   'engagedSessions' (GA4 engagedSessions, or sessions x engagementRate if GA4 did not return it),
  *   'averageSessionDuration', 'engagementRate' (fraction),
  *   'bookingEngineVisits' (float|null: sessions that contain the booking event / reached the booking engine),
  *   'bookingEngineEvents' (float|null: eventCount under the same filter), 'purchasers', 'purchaseRevenue',
@@ -46,9 +47,9 @@ final class CountryPerformance
             'country_performance',
             $current,
             self::DIMENSIONS,
-            ['totalUsers', 'sessions', 'averageSessionDuration', 'engagementRate', 'totalPurchasers', 'purchaseRevenue'],
+            ['totalUsers', 'sessions', 'engagedSessions', 'averageSessionDuration', 'engagementRate', 'totalPurchasers', 'purchaseRevenue'],
             null,
-            [['field' => 'sessions', 'metric' => true, 'desc' => true]],
+            [['field' => 'engagedSessions', 'metric' => true, 'desc' => true]],
             $limit,
         ));
 
@@ -88,6 +89,7 @@ final class CountryPerformance
                 'sourceMedium' => $row['dimensions']['sessionSourceMedium'],
                 'users' => $m['totalUsers'] ?? 0.0,
                 'sessions' => $m['sessions'] ?? 0.0,
+                'engagedSessions' => $m['engagedSessions'] ?? round(($m['sessions'] ?? 0.0) * ($m['engagementRate'] ?? 0.0), 1),
                 'previousSessions' => $previousSessions,
                 'sessionsChange' => Compare::change($m['sessions'] ?? 0.0, $previousSessions),
                 'averageSessionDuration' => $m['averageSessionDuration'] ?? 0.0,

@@ -77,9 +77,28 @@ The files mirror a Laravel 11 or 12 project. Copy them into your project, keepin
 | `/cron/queue-work` | POST | Process the queue for up to 55 seconds (skip if Supervisor runs a worker) |
 | `/cron/retry-failed` | POST | Re-queue failed or partly sent reports within the attempt limit |
 | `/cron/health` | GET | Last sent report per property, queue size, optional heartbeat ping |
+| `/cron/send-test` | POST | **MANUAL USE ONLY, not for the crontab.** Sends one `[TEST] ` report email to the single address in the body |
 
 Add `?property=slug` to the two report routes to run a single hotel. Every request needs the
 `X-Cron-Token` header. A wrong or missing token gets a 404.
+
+### Send a test email (manual)
+
+`POST /cron/send-test` sends one report email, with `[TEST] ` in front of the subject, to **one address you give and nobody
+else**. It never reads the recipients table, never creates deliveries and never touches the reports record, so it cannot
+send a report twice or to a hotel's real recipients. It needs the same `X-Cron-Token` header as the other routes (a wrong
+token gets a 404).
+
+```
+curl -X POST -H "X-Cron-Token: YOUR_CRON_TOKEN" -H "Accept: application/json" \
+     -d "property=nandini" -d "type=weekly" -d "period_start=2026-11-09" -d "to=you@example.com" \
+     https://YOUR_DOMAIN/cron/send-test
+```
+
+Body: `property` (slug), `type` (`weekly` or `monthly`), `period_start` (optional, `Y-m-d`), `to` (one valid email, required).
+It returns `{"ok": true, "subject": "[TEST] Nandini Weekly Traffic Report: 9 to 15 Nov 2026", "to": "you@example.com"}`.
+It can take up to a minute when the report has to be built from Google. **Do not add it to the crontab.** The same thing from
+the command line: `php artisan report:send-test nandini weekly --to=you@example.com` (see `docs/email-report.md`).
 
 ## Crontab
 

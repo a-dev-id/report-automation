@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Reports;
 
 use App\Support\ReportFormat;
+use DateTimeImmutable;
 
 /**
  * Rule-based "Traffic Quality Insight" for one payload (see docs/payload.md). No external API.
@@ -16,26 +17,39 @@ use App\Support\ReportFormat;
  *   purchases, AI traffic. Engagement and users fill up to 3 bullets if too little else is available.
  * - Sections that are missing or are {error} objects are skipped, never guessed.
  * - A zero or missing previous value never divides: the wording says "no comparison available".
- * - The caution is one neutral line when payload.quality_alerts has entries.
+ *
+ * Large-change guard: a metric that moved by more than report.insights.large_drop_percent (a drop) or
+ * large_rise_percent (a rise) is NOT stated as a fact. The headline leaves it out, bullets give only the value, and
+ * the caution gets one neutral sentence suggesting a tracking check. The KPI tile in the email still shows the number.
+ *
+ * Caution = large-change sentence (if any) + one data-quality sentence (if payload.quality_alerts has entries).
  * Thresholds: config report.insights.
  */
 final class InsightGenerator
 {
+    /** @var array<string, array{label: string, percent: float, against: string}> metrics held back by the guard */
+    private array $flagged = [];
+
     /** @param  array<string, mixed>  $payload */
     public function generate(array $payload): array
     {
+        $this->flagged = [];
+
         $monthly = ($payload['meta']['type'] ?? 'weekly') === 'monthly';
         $words = $monthly
-            ? ['this' => 'This month', 'previous' => 'last month', 'yearAgo' => 'the same month last year', 'unit' => 'month']
-            : ['this' => 'This week', 'previous' => 'the previous week', 'yearAgo' => null, 'unit' => 'week'];
+            ? ['this' => 'This month', 'previous' => 'last month', 'yearAgo' => 'the same month last year', 'yearAgoName' => $this->yearAgoName($payload)]
+            : ['this' => 'This week', 'previous' => 'the previous week', 'yearAgo' => null, 'yearAgoName' => null];
         $currency = (string) ($payload['meta']['currency'] ?? '');
 
         $site = $this->section($payload, 'site');
 
+        // The headline runs first so the guard sees the headline metrics first.
+        $headline = $this->headline($site, $words);
+
         $bullets = array_values(array_filter([
             $this->channelBullet($this->section($payload, 'channels'), $words),
             $this->bookingBullet($site, $words),
-            $this->countryBullet($this->section($payload, 'country_performance')),
+            $this->countryBullet($this->section($payload, 'country_performance'), $this->section($payload, 'countries')),
             $this->purchaseBullet($site, $words, $currency),
             $this->aiBullet($this->section($payload, 'ai_traffic'), $words),
         ]));
@@ -48,7 +62,7 @@ final class InsightGenerator
         }
 
         return [
-            'headline' => $this->headline($site, $words),
+            'headline' => $headline,
             'bullets' => array_slice($bullets, 0, max(1, (int) config('report.insights.max_bullets'))),
             'caution' => $this->caution($payload['quality_alerts'] ?? []),
         ];
@@ -62,26 +76,47 @@ final class InsightGenerator
             return $words['this'].': traffic figures are not available for this report.';
         }
 
-        $parts = ['sessions '.$this->move($site['sessions'])];
+        // Sessions always anchor the headline. A guarded sessions change is left out: only the value is stated.
+        if ($this->guarded($site['sessions']['change'] ?? null)) {
+            $this->flag('Sessions', $site['sessions']['change'], $words['previous']);
+            $parts = ['sessions were '.ReportFormat::number($site['sessions']['current'] ?? null)];
+            $hasComparison = false;
+        } else {
+            $parts = ['sessions '.$this->move($site['sessions'])];
+            $hasComparison = $this->hasComparison($site['sessions']);
+        }
+
+        // Key events: only when the change is not guarded. If it is, it is not mentioned here at all.
         if (isset($site['keyEvents'])) {
-            $parts[] = 'key events '.$this->move($site['keyEvents']);
+            if ($this->guarded($site['keyEvents']['change'] ?? null)) {
+                $this->flag('Key events', $site['keyEvents']['change'], $words['previous']);
+            } else {
+                $parts[] = 'key events '.$this->move($site['keyEvents']);
+                $hasComparison = $hasComparison || $this->hasComparison($site['keyEvents']);
+            }
         }
 
         $text = $words['this'].', '.implode(' and ', $parts);
-
-        $hasComparison = $this->hasComparison($site['sessions']) || (isset($site['keyEvents']) && $this->hasComparison($site['keyEvents']));
         $text .= $hasComparison ? ", compared with {$words['previous']}." : '.';
 
         if ($words['yearAgo'] !== null) {
             $yearAgo = [];
-            foreach (['sessions' => 'sessions', 'keyEvents' => 'key events'] as $key => $label) {
-                if (isset($site[$key]) && ($phrase = $this->yearAgoPhrase($site[$key])) !== null) {
-                    $yearAgo[] = "{$label} are {$phrase}";
+            foreach (['sessions' => 'Sessions', 'keyEvents' => 'Key events'] as $key => $label) {
+                if (! isset($site[$key])) {
+                    continue;
+                }
+                if ($this->guarded($site[$key]['yearAgoChange'] ?? null)) {
+                    $this->flag($label, $site[$key]['yearAgoChange'], $words['yearAgoName'] ?? $words['yearAgo']);
+
+                    continue;
+                }
+                if (($phrase = $this->yearAgoPhrase($site[$key])) !== null) {
+                    $yearAgo[] = strtolower($label)." are {$phrase}";
                 }
             }
             if ($yearAgo !== []) {
                 $text .= " Against {$words['yearAgo']}, ".implode(' and ', $yearAgo).'.';
-            } else {
+            } elseif ($this->flagged === []) {
                 $text .= ' No year-over-year comparison is available.';
             }
         }
@@ -147,74 +182,98 @@ final class InsightGenerator
         $previousRate = $this->rate($visits['previous'] ?? null, $sessions['previous'] ?? null);
 
         $text = 'Booking engine: '.ReportFormat::number($visits['current']).' sessions reached it'
-            .($rate !== null ? ' ('.ReportFormat::percent($rate).' of all sessions)' : '').', '.$this->movePhrase($visits, $words['previous']).'.';
+            .($rate !== null ? ' ('.ReportFormat::percent($rate).' of all sessions)' : '').', '.$this->movePhrase($visits, $words['previous'], 'Booking engine visits').'.';
 
-        if ($rate !== null && $previousRate !== null) {
+        // The rate comparison is only a fact if the underlying change is not guarded.
+        if ($rate !== null && $previousRate !== null && ! $this->guarded($visits['change'] ?? null)) {
             $text .= ' The booking-engine rate was '.ReportFormat::percent($previousRate)." in {$words['previous']}.";
         }
 
         return $text;
     }
 
-    /** The country with the best traffic quality, not the most sessions. */
-    private function countryBullet(?array $rows): ?string
+    /**
+     * The country with the best traffic quality, not the most sessions. Included only when the winner has enough
+     * sessions and a booking-engine rate or purchase rate above the configured minimum: no weak filler.
+     * Rates are measured on the country's rows in the Country Performance table (its top traffic sources), which the
+     * wording says ("top-source sessions").
+     */
+    private function countryBullet(?array $rows, ?array $countries = null): ?string
     {
         if ($rows === null || $rows === []) {
             return null;
         }
 
-        $min = (int) config('report.insights.min_country_sessions');
-        $countries = [];
+        // All rows feed the "largest" and "engaged leader" facts; only clean rows compete on quality.
+        $all = [];
+        $clean = [];
         foreach ($rows as $row) {
             $name = (string) ($row['country'] ?? '');
-            if ($name === '' || ($row['checkForBots'] ?? false) || ($row['quality'] ?? '') === 'Low Data') {
+            if ($name === '') {
                 continue;
             }
-            $c = &$countries[$name];
-            $c ??= ['name' => $name, 'sessions' => 0.0, 'visits' => null, 'purchasers' => 0.0, 'engaged' => 0.0, 'quality' => []];
+
             $sessions = (float) ($row['sessions'] ?? 0);
+            $engaged = (float) ($row['engagedSessions'] ?? $sessions * (float) ($row['engagementRate'] ?? 0));
+            $all[$name]['sessions'] = ($all[$name]['sessions'] ?? 0.0) + $sessions;
+            $all[$name]['engaged'] = ($all[$name]['engaged'] ?? 0.0) + $engaged;
+
+            if (($row['checkForBots'] ?? false) || ($row['quality'] ?? '') === 'Low Data') {
+                continue;
+            }
+
+            $c = &$clean[$name];
+            $c ??= ['name' => $name, 'sessions' => 0.0, 'visits' => null, 'purchasers' => 0.0];
             $c['sessions'] += $sessions;
             $c['purchasers'] += (float) ($row['purchasers'] ?? 0);
-            $c['engaged'] += $sessions * (float) ($row['engagementRate'] ?? 0);
             if (($row['bookingEngineVisits'] ?? null) !== null) {
                 $c['visits'] = ($c['visits'] ?? 0.0) + (float) $row['bookingEngineVisits'];
             }
-            $c['quality'][] = (string) ($row['quality'] ?? '');
             unset($c);
         }
 
-        $countries = array_filter($countries, fn (array $c) => $c['sessions'] >= $min);
-        if ($countries === []) {
+        $clean = array_filter($clean, fn (array $c) => $c['sessions'] > 0);
+        if ($clean === []) {
             return null;
         }
 
-        $knowsBookings = array_filter($countries, fn (array $c) => $c['visits'] !== null) !== [];
+        $knowsBookings = array_filter($clean, fn (array $c) => $c['visits'] !== null) !== [];
         $score = fn (array $c) => $knowsBookings
             ? ($c['visits'] ?? 0.0) / $c['sessions'] + $c['purchasers'] / $c['sessions']
             : $c['purchasers'] / $c['sessions'];
 
-        // Only countries that show some real intent can be "best quality".
-        $candidates = array_filter($countries, fn (array $c) => $score($c) > 0);
-        if ($candidates === []) {
+        $ranked = array_values($clean);
+        usort($ranked, fn (array $a, array $b) => [$score($b), $b['purchasers'], $b['sessions']] <=> [$score($a), $a['purchasers'], $a['sessions']]);
+        $top = $ranked[0];
+
+        $minSessions = (float) config('report.insights.min_country_sessions');
+        $minRate = (float) config('report.insights.min_country_rate_percent');
+        $bookingRate = $top['visits'] !== null ? $top['visits'] / $top['sessions'] * 100 : 0.0;
+        $purchaseRate = $top['purchasers'] / $top['sessions'] * 100;
+
+        if ($top['sessions'] < $minSessions || ($bookingRate <= $minRate && $purchaseRate <= $minRate)) {
             return null;
         }
 
-        usort($candidates, fn (array $a, array $b) => [$score($b), $b['purchasers'], $b['sessions']] <=> [$score($a), $a['purchasers'], $a['sessions']]);
-        $top = $candidates[0];
-
         $detail = [];
-        if ($top['visits'] !== null) {
-            $detail[] = ReportFormat::percent($top['visits'] / $top['sessions'] * 100).' of its '.ReportFormat::number($top['sessions']).' sessions reached the booking engine';
+        if ($top['visits'] !== null && $bookingRate > $minRate) {
+            $detail[] = ReportFormat::percent($bookingRate).' of its '.ReportFormat::number($top['sessions']).' top-source sessions reached the booking engine';
         }
-        if ($top['purchasers'] > 0) {
-            $detail[] = ReportFormat::number($top['purchasers']).' purchaser'.($top['purchasers'] == 1 ? '' : 's');
+        if ($top['purchasers'] > 0 && $purchaseRate > $minRate) {
+            $detail[] = ReportFormat::number($top['purchasers']).' purchaser'.($top['purchasers'] == 1 ? '' : 's').' ('.ReportFormat::percent($purchaseRate).' of those sessions)';
         }
 
-        $largest = $countries;
-        usort($largest, fn (array $a, array $b) => $b['sessions'] <=> $a['sessions']);
-        $note = $largest[0]['name'] !== $top['name'] ? " The largest source of sessions was {$largest[0]['name']}, but it ranks lower on quality." : '';
+        $text = "Best traffic quality: {$top['name']} ({$this->joinDetail($detail)}), judged on booking and purchase activity rather than session count.";
 
-        return "Best traffic quality: {$top['name']} ({$this->joinDetail($detail)}), judged on booking and purchase activity rather than session count.{$note}";
+        // The rows are only the top country x source rows, so the true largest and engaged leader come from the countries section.
+        $largest = $countries['largestBySessions']['country'] ?? $this->leader($all, 'sessions');
+        if ($largest !== null && $largest !== $top['name']) {
+            $engagedLeader = $countries['engagedLeader']['country'] ?? $this->leader($all, 'engaged');
+            $text .= " The largest country by sessions was {$largest}";
+            $text .= $engagedLeader !== null && $engagedLeader !== $largest ? ", and the engaged-sessions leader was {$engagedLeader}." : '.';
+        }
+
+        return $text;
     }
 
     private function purchaseBullet(?array $site, array $words, string $currency): ?string
@@ -233,12 +292,12 @@ final class InsightGenerator
         }
 
         if ($current <= 0) {
-            return "Purchases: none recorded {$this->lower($words['this'])}, compared with ".ReportFormat::number($previous)." in {$words['previous']}.";
+            return 'Purchases: none recorded '.lcfirst($words['this']).', compared with '.ReportFormat::number($previous)." in {$words['previous']}.";
         }
 
         $money = is_array($revenue) && ($revenue['current'] ?? 0) > 0 ? ' worth '.ReportFormat::money($revenue['current'], $currency) : '';
 
-        return 'Purchases: '.ReportFormat::number($current).' purchase'.($current == 1.0 ? '' : 's').$money.', '.$this->movePhrase($purchases, $words['previous']).'.';
+        return 'Purchases: '.ReportFormat::number($current).' purchase'.($current == 1.0 ? '' : 's').$money.', '.$this->movePhrase($purchases, $words['previous'], 'Purchases').'.';
     }
 
     private function aiBullet(?array $ai, array $words): ?string
@@ -251,7 +310,7 @@ final class InsightGenerator
         $top = $ai['sources'][0]['source'] ?? null;
 
         return 'AI assistants referred '.ReportFormat::number($total['current']).' sessions'
-            .($top !== null ? " (mostly {$top})" : '').', '.$this->movePhrase($total, $words['previous']).'.';
+            .($top !== null ? " (mostly {$top})" : '').', '.$this->movePhrase($total, $words['previous'], 'AI traffic').'.';
     }
 
     private function engagementBullet(?array $site, array $words): ?string
@@ -276,12 +335,40 @@ final class InsightGenerator
         $m = $site['totalUsers'] ?? null;
 
         return is_array($m) && ($m['current'] ?? null) !== null
-            ? 'Users: '.ReportFormat::number($m['current']).', '.$this->movePhrase($m, $words['previous']).'.'
+            ? 'Users: '.ReportFormat::number($m['current']).', '.$this->movePhrase($m, $words['previous'], 'Users').'.'
             : null;
     }
 
     /** @param  mixed  $alerts */
     private function caution(mixed $alerts): ?string
+    {
+        $parts = array_filter([$this->largeChangeSentence(), $this->qualitySentence($alerts)]);
+
+        return $parts === [] ? null : implode(' ', $parts);
+    }
+
+    /** One neutral sentence for every metric the guard held back. */
+    private function largeChangeSentence(): ?string
+    {
+        if ($this->flagged === []) {
+            return null;
+        }
+
+        $items = [];
+        foreach (array_values($this->flagged) as $i => $f) {
+            $label = $i === 0 ? $f['label'] : lcfirst($f['label']);
+            $items[] = sprintf('%s changed by %s%s versus %s', $label, $f['percent'] > 0 ? '+' : '', ReportFormat::percent($f['percent']), $f['against']);
+        }
+
+        $many = count($items) > 1;
+
+        return implode(' and ', $items).'. '
+            .($many ? 'Changes this large often come' : 'A change this large often comes')
+            .' from a change in how events are tracked, so please check the tracking setup before drawing conclusions.';
+    }
+
+    /** @param  mixed  $alerts */
+    private function qualitySentence(mixed $alerts): ?string
     {
         if (! is_array($alerts) || $alerts === []) {
             return null;
@@ -310,6 +397,23 @@ final class InsightGenerator
         return is_array($section) && ! isset($section['error']) ? $section : null;
     }
 
+    /** True when a change is beyond the configured guard. A missing percent (new, none) is never guarded. */
+    private function guarded(?array $change): bool
+    {
+        $percent = $change['percent'] ?? null;
+        if ($percent === null) {
+            return false;
+        }
+
+        return $percent < -(float) config('report.insights.large_drop_percent')
+            || $percent > (float) config('report.insights.large_rise_percent');
+    }
+
+    private function flag(string $label, array $change, string $against): void
+    {
+        $this->flagged["{$label}|{$against}"] = ['label' => $label, 'percent' => (float) $change['percent'], 'against' => $against];
+    }
+
     private function hasComparison(array $metric): bool
     {
         return in_array($metric['change']['direction'] ?? 'none', ['up', 'down', 'flat'], true);
@@ -331,11 +435,20 @@ final class InsightGenerator
         };
     }
 
-    /** "up 8.0% from 143 in the previous week", "down 16.1% from 143", "no comparison available". */
-    private function movePhrase(array $metric, string $previousLabel): string
+    /**
+     * "up 8.0% from 143 in the previous week", "no comparison available". If the change is beyond the guard, only
+     * the previous value is given and the change is left to the caution line.
+     */
+    private function movePhrase(array $metric, string $previousLabel, string $metricLabel): string
     {
         $change = $metric['change'] ?? [];
         $previous = ReportFormat::number($metric['previous'] ?? null);
+
+        if ($this->guarded($change)) {
+            $this->flag($metricLabel, $change, $previousLabel);
+
+            return "compared with {$previous} in {$previousLabel} (see the note below)";
+        }
 
         return match ($change['direction'] ?? 'none') {
             'up' => 'up '.ReportFormat::percent($change['percent'] ?? null)." from {$previous} in {$previousLabel}",
@@ -358,19 +471,39 @@ final class InsightGenerator
         };
     }
 
+    /** "October 2025" for a monthly report of October 2026. */
+    private function yearAgoName(array $payload): string
+    {
+        $start = $payload['meta']['dateRanges']['yearAgo'][0] ?? null;
+
+        try {
+            return $start ? (new DateTimeImmutable($start))->format('F Y') : 'the same month last year';
+        } catch (\Throwable) {
+            return 'the same month last year';
+        }
+    }
+
     private function rate(int|float|null $part, int|float|null $whole): ?float
     {
         return $part === null || $whole === null || (float) $whole <= 0 ? null : (float) $part / (float) $whole * 100;
+    }
+
+    /** The country with the highest value of $key, or null when nothing is above zero. */
+    private function leader(array $countries, string $key): ?string
+    {
+        $best = null;
+        foreach ($countries as $name => $values) {
+            if ($values[$key] > 0 && ($best === null || $values[$key] > $countries[$best][$key])) {
+                $best = $name;
+            }
+        }
+
+        return $best;
     }
 
     /** @param  list<string>  $detail */
     private function joinDetail(array $detail): string
     {
         return $detail === [] ? 'high engagement' : implode(', ', $detail);
-    }
-
-    private function lower(string $text): string
-    {
-        return lcfirst($text);
     }
 }

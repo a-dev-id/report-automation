@@ -84,7 +84,7 @@ class ReportEmailTest extends TestCase
         $this->assertSame('Nandini Weekly Traffic Report: 9 to 15 Nov 2026', $mail->envelope()->subject);
         $this->assertStringContainsString('<title>Nandini Weekly Traffic Report: 9 to 15 Nov 2026</title>', $html);
 
-        $order = ['Traffic Quality Insight', 'Sessions</div>', 'Sessions, last 8 weeks', 'Traffic by channel', 'Top countries', 'Country performance',
+        $order = ['Traffic Quality Insight', '>Sessions</td>', 'Sessions, last 8 weeks', 'Traffic by channel', 'Top countries by engaged sessions', 'Country performance',
             'Paid advertising', 'Traffic from AI assistants', 'Search Console', 'Data notes'];
         $last = -1;
         foreach ($order as $marker) {
@@ -173,7 +173,9 @@ class ReportEmailTest extends TestCase
         $this->assertStringNotContainsString('display:grid', $html);
         $this->assertStringContainsString('Arial, Helvetica, sans-serif', $html);
 
-        preg_match_all('/font-size:(\d+)px/', $html, $sizes);
+        // The hidden preheader is 1px on purpose (it is not visible text), so it is left out of the font-size check.
+        $visible = preg_replace('#<div style="display:none;.*?</div>#s', '', $html);
+        preg_match_all('/font-size:(\d+)px/', $visible, $sizes);
         $body = array_filter($sizes[1], fn ($s) => (int) $s < 14);
         $this->assertNotEmpty($sizes[1]);
         // Anything under 14px is a label (13px) or a data note / footer (12px), never body text.

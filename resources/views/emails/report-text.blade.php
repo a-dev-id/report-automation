@@ -52,12 +52,12 @@ This section is temporarily unavailable.
 @endif
 @if ($view['countries'])
 
-TOP COUNTRIES
+{!! strtoupper($view['countries']['title'] ?? 'Top countries by engaged sessions') !!}
 @if ($view['countries']['unavailable'])
 This section is temporarily unavailable.
 @else
 @foreach ($view['countries']['rows'] as $row)
- * {!! $row['name'] !!}: {!! $row['sessions'] !!} sessions ({!! $row['share'] !!} of traffic, {!! $arrow($row['change']) !!})
+ * {!! $row['name'] !!}: {!! $row['engaged'] !!} engaged sessions, {!! $row['sessions'] !!} sessions ({!! $row['share'] !!} of traffic, {!! $arrow($row['change']) !!})
 @endforeach
 @endif
 @endif
@@ -68,7 +68,7 @@ COUNTRY PERFORMANCE
 This section is temporarily unavailable.
 @else
 @foreach ($view['countryPerformance']['rows'] as $row)
- * {!! $row['country'] !!}@if ($row['detail'] !== '') ({!! $row['detail'] !!})@endif: {!! $row['sessions'] !!} sessions, engagement {!! $row['engagement'] !!}, booking visits {!! $row['bookingVisits'] !!}, {!! $row['quality'] !!}@if ($row['flag']) [{!! $row['flag'] !!}]@endif
+ * {!! $row['country'] !!}@if ($row['detail'] !== '') ({!! $row['detail'] !!})@endif: {!! $row['sessions'] !!} sessions, {!! $row['engaged'] !!} engaged, engagement {!! $row['engagement'] !!}, booking visits {!! $row['bookingVisits'] !!}, {!! $row['quality'] !!}@if ($row['flag']) [{!! $row['flag'] !!}]@endif
 
 @endforeach
 @endif

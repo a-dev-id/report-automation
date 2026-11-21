@@ -47,9 +47,10 @@ class InsightGeneratorTest extends TestCase
 
         // The country is picked on quality, not volume: Indonesia has the most sessions, Australia the best booking rate.
         $this->assertStringStartsWith('Best traffic quality: Australia', $country);
-        $this->assertStringContainsString('4.4% of its 1,800 sessions reached the booking engine', $country);
-        $this->assertStringContainsString('4 purchasers', $country);
-        $this->assertStringContainsString('The largest source of sessions was Indonesia, but it ranks lower on quality.', $country);
+        $this->assertStringContainsString('4.4% of its 1,800 top-source sessions reached the booking engine', $country);
+        $this->assertStringNotContainsString('purchaser', $country);                         // 4 of 1,800 is below the 1% minimum: not mentioned
+        $this->assertStringContainsString('The largest country by sessions was Indonesia.', $country);
+        $this->assertStringNotContainsString('ranks lower', $country);
     }
 
     public function test_monthly_insight_uses_month_wording_and_year_ago(): void

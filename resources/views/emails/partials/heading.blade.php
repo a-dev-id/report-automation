@@ -1,1 +1,1 @@
-<div style="font-family:Arial, Helvetica, sans-serif; font-size:18px; font-weight:bold; color:#111827; padding-bottom:12px;">{{ $title }}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-family:Arial, Helvetica, sans-serif; font-size:18px; line-height:24px; font-weight:bold; color:#111827; padding:0 0 12px 0;">{{ $title }}</td></tr></table>

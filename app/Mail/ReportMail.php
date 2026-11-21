@@ -23,6 +23,8 @@ use Throwable;
  *
  * $charts are PNG paths from ChartRenderer. The job renders them once and passes them in so every recipient
  * gets the same images. Without them (null) they are rendered here, and a failed chart is just a fallback table.
+ *
+ * $subjectPrefix is "" for a real report and "[TEST] " for report:send-test.
  */
 class ReportMail extends Mailable
 {
@@ -30,14 +32,14 @@ class ReportMail extends Mailable
     use SerializesModels;
 
     /** @param  array<string, string|null>|null  $charts */
-    public function __construct(public Report $report, public Property $property, public ?array $charts = null)
+    public function __construct(public Report $report, public Property $property, public ?array $charts = null, public string $subjectPrefix = '')
     {
     }
 
     public function envelope(): Envelope
     {
         // Example: "Nandini Weekly Traffic Report: 9 to 15 Nov 2026"
-        return new Envelope(subject: ReportViewData::subject($this->property, $this->report->period()));
+        return new Envelope(subject: $this->subjectPrefix.ReportViewData::subject($this->property, $this->report->period()));
     }
 
     public function content(): Content

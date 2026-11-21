@@ -72,7 +72,7 @@ class ReportPreview
     }
 
     /** @return array{0: array<string, mixed>, 1: string} payload and where it came from */
-    private function payload(Property $property, ReportPeriod $period, bool $fresh): array
+    public function payload(Property $property, ReportPeriod $period, bool $fresh): array
     {
         $stored = Report::query()
             ->where('property_id', $property->id)

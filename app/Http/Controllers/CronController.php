@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Enums\ReportStatus;
 use App\Enums\ReportType;
 use App\Jobs\BuildAndSendReport;
+use App\Services\Reports\ReportTestSender;
 use App\Models\Property;
 use App\Models\Report;
 use App\Support\ReportPeriod;
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Validator;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -37,6 +40,45 @@ class CronController extends Controller
     public function monthlyReport(Request $request): JsonResponse
     {
         return $this->queueReports($request, ReportType::Monthly);
+    }
+
+    /**
+     * POST /cron/send-test: MANUAL USE, not in the crontab. Sends one "[TEST] " report email to the single address in
+     * "to" and nobody else. Body: property (slug), type (weekly|monthly), period_start (optional, Y-m-d), to (one email).
+     * No recipients table, no deliveries, no reports row. Returns {ok, subject, to}.
+     */
+    public function sendTest(Request $request, ReportTestSender $sender): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'property' => ['required', 'string', 'exists:properties,slug'],
+            'type' => ['required', 'in:weekly,monthly'],
+            'period_start' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['required', 'string', 'email'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['ok' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        // Building a report can take a while when it has to call Google.
+        @set_time_limit(180);
+
+        try {
+            $result = $sender->send(
+                Property::query()->where('slug', $request->input('property'))->firstOrFail(),
+                ReportType::from($request->input('type')),
+                $request->input('period_start'),
+                [(string) $request->input('to')],
+            );
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['ok' => false, 'message' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            Log::error('Test email failed.', ['exception' => $e]);
+
+            return response()->json(['ok' => false, 'message' => 'Sending failed: '.class_basename($e)], 500);
+        }
+
+        return response()->json(['ok' => true, 'subject' => $result['subject'], 'to' => $result['to'][0]]);
     }
 
     /** POST /cron/queue-work: processes queued jobs for up to 55 seconds. Not needed if Supervisor runs a worker. */

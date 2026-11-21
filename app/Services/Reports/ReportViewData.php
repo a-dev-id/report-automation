@@ -51,6 +51,9 @@ final class ReportViewData
             'language' => $property->language ?: 'en',
             'brandColor' => preg_match('/^#[0-9a-fA-F]{6}$/', (string) $property->brand_color) ? (string) $property->brand_color : self::DEFAULT_COLOR,
             'logoPath' => $logoPath,
+            'logoHeight' => self::imageHeight($logoPath, 56, 56),
+            'headerTextColor' => self::readableTextOn(preg_match('/^#[0-9a-fA-F]{6}$/', (string) $property->brand_color) ? (string) $property->brand_color : self::DEFAULT_COLOR),
+            'preheader' => self::preheader((string) ($insight['headline'] ?? '')),
             'title' => ucfirst($period->type->value).' Traffic Report',
             'periodLabel' => $period->label(),
             'subject' => self::subject($property, $period),
@@ -130,6 +133,7 @@ final class ReportViewData
         return [
             'unavailable' => false,
             'hasChart' => ($charts['trend'] ?? null) !== null,
+            'imgHeight' => self::imageHeight($charts['trend'] ?? null, 592, 296),
             'rows' => array_map(fn (array $p) => [
                 'label' => (new DateTimeImmutable($p['start']))->format($weekly ? 'j M' : 'M Y'),
                 'sessions' => ReportFormat::number($p['sessions']),
@@ -152,6 +156,7 @@ final class ReportViewData
         return [
             'unavailable' => false,
             'hasChart' => ($charts['channels'] ?? null) !== null,
+            'imgHeight' => self::imageHeight($charts['channels'] ?? null, 592, 300),
             'rows' => array_map(fn (array $r) => [
                 'name' => (string) $r['channel'],
                 'sessions' => ReportFormat::number($r['sessions']['current']),
@@ -175,8 +180,12 @@ final class ReportViewData
         return [
             'unavailable' => false,
             'hasChart' => ($charts['countries'] ?? null) !== null,
+            'imgHeight' => self::imageHeight($charts['countries'] ?? null, 592, 400),
+            // The chart carries its own title ("Top countries by engaged sessions"), so the section heading is not repeated above it.
+            'title' => ($charts['countries'] ?? null) !== null ? 'Top countries' : 'Top countries by engaged sessions',
             'rows' => array_map(fn (array $r) => [
                 'name' => (string) $r['country'],
+                'engaged' => ReportFormat::number($r['engagedSessions']['current'] ?? null),
                 'sessions' => ReportFormat::number($r['sessions']['current']),
                 'share' => ReportFormat::percent($r['share']['current'] ?? null),
                 'change' => ReportFormat::change($r['sessions']['change'] ?? null),
@@ -205,6 +214,7 @@ final class ReportViewData
                     'country' => (string) $r['country'],
                     'detail' => $detail,
                     'sessions' => ReportFormat::number($r['sessions']),
+                    'engaged' => ReportFormat::number($r['engagedSessions'] ?? null),
                     'engagement' => isset($r['engagementRate']) ? ReportFormat::rate($r['engagementRate']) : '–',
                     'bookingVisits' => ($r['bookingEngineVisits'] ?? null) === null ? '–' : ReportFormat::number($r['bookingEngineVisits']),
                     'quality' => (string) ($r['quality'] ?? ''),
@@ -374,6 +384,41 @@ final class ReportViewData
     }
 
     // ----------------------------------------------------------------------------------------------
+
+    /** Hidden inbox preview text: the insight headline, at most 90 characters (cut at a word, ending in an ellipsis). */
+    public static function preheader(string $headline): string
+    {
+        $text = trim((string) preg_replace('/\s+/', ' ', $headline));
+        if (mb_strlen($text) <= 90) {
+            return $text;
+        }
+
+        $cut = mb_substr($text, 0, 89);
+        $space = mb_strrpos($cut, ' ');
+        if ($space !== false && $space > 50) {
+            $cut = mb_substr($cut, 0, $space);
+        }
+
+        return rtrim($cut, ' ,;:.').'…';
+    }
+
+    /** White or near-black, whichever is readable on this hex background. */
+    public static function readableTextOn(string $hex): string
+    {
+        $r = hexdec(substr($hex, 1, 2));
+        $g = hexdec(substr($hex, 3, 2));
+        $b = hexdec(substr($hex, 5, 2));
+
+        return (0.299 * $r + 0.587 * $g + 0.114 * $b) / 255 > 0.6 ? '#111827' : '#FFFFFF';
+    }
+
+    /** Height in px an image gets when shown $width px wide, from the file's own size. Outlook needs it as an attribute. */
+    private static function imageHeight(?string $path, int $width, int $fallback): int
+    {
+        $size = $path !== null && is_file($path) ? @getimagesize($path) : false;
+
+        return $size !== false && $size[0] > 0 ? (int) round($width * $size[1] / $size[0]) : $fallback;
+    }
 
     private static function failed(array $payload, string $key): bool
     {
