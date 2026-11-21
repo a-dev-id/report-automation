@@ -1,0 +1,1 @@
+<div style="font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:20px; color:#4B5563; background:#F3F4F6; border:1px solid #E5E7EB; border-radius:4px; padding:14px 16px;">This section is temporarily unavailable.</div>

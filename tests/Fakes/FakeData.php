@@ -75,7 +75,7 @@ final class FakeData
         $r = self::r(...);
 
         $channels = fn (array $values) => array_map(
-            fn ($name, $sessions) => $r(['sessionDefaultChannelGroup' => $name], ['sessions' => $sessions, 'totalUsers' => $sessions * 0.7, 'averageSessionDuration' => 60]),
+            fn ($name, $sessions) => $r(['sessionDefaultChannelGroup' => $name], ['sessions' => $sessions, 'totalUsers' => $sessions * 0.7, 'averageSessionDuration' => 60, 'engagementRate' => 0.5]),
             array_keys($values),
             $values,
         );
@@ -88,7 +88,7 @@ final class FakeData
 
         $perf = fn (string $country, string $campaign, string $sourceMedium, array $m) => $r(
             ['country' => $country, 'sessionCampaignName' => $campaign, 'sessionSourceMedium' => $sourceMedium],
-            $m,
+            $m + ['engagementRate' => 0.5],
         );
         $perfKey = fn (string $country, string $campaign, string $sourceMedium, float $events, float $sessions) => $r(
             ['country' => $country, 'sessionCampaignName' => $campaign, 'sessionSourceMedium' => $sourceMedium],
@@ -97,9 +97,9 @@ final class FakeData
 
         return [
             'site.totals' => [
-                'current' => [$r([], ['sessions' => 10000, 'totalUsers' => 7000, 'averageSessionDuration' => 95.5, 'ecommercePurchases' => 12, 'purchaseRevenue' => 48000000])],
-                'previous' => [$r([], ['sessions' => 8000, 'totalUsers' => 6000, 'averageSessionDuration' => 100, 'ecommercePurchases' => 10, 'purchaseRevenue' => 40000000])],
-                'yearAgo' => [$r([], ['sessions' => 5000, 'totalUsers' => 3500, 'averageSessionDuration' => 80, 'ecommercePurchases' => 6, 'purchaseRevenue' => 20000000])],
+                'current' => [$r([], ['sessions' => 10000, 'totalUsers' => 7000, 'engagementRate' => 0.62, 'keyEvents' => 350, 'averageSessionDuration' => 95.5, 'ecommercePurchases' => 12, 'purchaseRevenue' => 48000000])],
+                'previous' => [$r([], ['sessions' => 8000, 'totalUsers' => 6000, 'engagementRate' => 0.6, 'keyEvents' => 300, 'averageSessionDuration' => 100, 'ecommercePurchases' => 10, 'purchaseRevenue' => 40000000])],
+                'yearAgo' => [$r([], ['sessions' => 5000, 'totalUsers' => 3500, 'engagementRate' => 0.55, 'keyEvents' => 200, 'averageSessionDuration' => 80, 'ecommercePurchases' => 6, 'purchaseRevenue' => 20000000])],
             ],
             'site.booking' => [
                 'current' => [$r([], ['sessions' => 900, 'eventCount' => 2700])],
@@ -204,7 +204,7 @@ final class FakeData
      */
     private static function scale(array $fixture, int $factor): array
     {
-        $countKeys = ['sessions', 'totalUsers', 'ecommercePurchases', 'purchaseRevenue', 'totalPurchasers', 'eventCount',
+        $countKeys = ['sessions', 'totalUsers', 'ecommercePurchases', 'purchaseRevenue', 'totalPurchasers', 'keyEvents', 'eventCount',
             'advertiserAdImpressions', 'advertiserAdClicks', 'advertiserAdCost', 'clicks', 'impressions'];
 
         $walk = function (mixed $node) use (&$walk, $countKeys, $factor): mixed {

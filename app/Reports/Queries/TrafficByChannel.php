@@ -15,7 +15,8 @@ use App\Support\ReportPeriod;
  * report.top.channels) and an "Other" row that sums the rest.
  *
  * Output: ['total' => ['sessions' => metric], 'rows' => [['channel', 'isOther', 'sessions' => metric, 'totalUsers' => metric,
- *   'averageSessionDuration' => metric (seconds; for "Other" the sessions-weighted average)], ...]]
+ *   'averageSessionDuration' => metric (seconds), 'engagementRate' => metric (fraction)]; for "Other" both are
+ *   sessions-weighted averages of the rest], ...]]
  */
 final class TrafficByChannel
 {
@@ -23,8 +24,8 @@ final class TrafficByChannel
     {
     }
 
-    /** @return array<string, float> sessions-weighted average session duration per range */
-    private static function weightedDuration(array $groups, array $names): array
+    /** @return array<string, float> sessions-weighted average of a metric per range */
+    private static function weighted(array $groups, array $names, string $metric): array
     {
         $out = [];
         foreach ($names as $range) {
@@ -32,7 +33,7 @@ final class TrafficByChannel
             foreach ($groups as $group) {
                 $s = Ga4Rows::value($group, $range, 'sessions');
                 $sessions += $s;
-                $weighted += $s * Ga4Rows::value($group, $range, 'averageSessionDuration');
+                $weighted += $s * Ga4Rows::value($group, $range, $metric);
             }
             $out[$range] = $sessions > 0 ? $weighted / $sessions : 0.0;
         }
@@ -49,7 +50,7 @@ final class TrafficByChannel
             'channels',
             $ranges,
             ['sessionDefaultChannelGroup'],
-            ['sessions', 'totalUsers', 'averageSessionDuration'],
+            ['sessions', 'totalUsers', 'averageSessionDuration', 'engagementRate'],
             null,
             [['field' => 'sessions', 'metric' => true, 'desc' => true]],
         ));
@@ -66,6 +67,7 @@ final class TrafficByChannel
                 'sessions' => Ga4Rows::groupMetric($group, $names, 'sessions'),
                 'totalUsers' => Ga4Rows::groupMetric($group, $names, 'totalUsers'),
                 'averageSessionDuration' => Ga4Rows::groupMetric($group, $names, 'averageSessionDuration'),
+                'engagementRate' => Ga4Rows::groupMetric($group, $names, 'engagementRate'),
             ];
         }
 
@@ -75,7 +77,8 @@ final class TrafficByChannel
                 'isOther' => true,
                 'sessions' => \App\Support\Compare::metric(Ga4Rows::sum($rest, $names, 'sessions')),
                 'totalUsers' => \App\Support\Compare::metric(Ga4Rows::sum($rest, $names, 'totalUsers')),
-                'averageSessionDuration' => \App\Support\Compare::metric(self::weightedDuration($rest, $names)),
+                'averageSessionDuration' => \App\Support\Compare::metric(self::weighted($rest, $names, 'averageSessionDuration')),
+                'engagementRate' => \App\Support\Compare::metric(self::weighted($rest, $names, 'engagementRate')),
             ];
         }
 

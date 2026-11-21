@@ -22,7 +22,7 @@ use App\Support\ReportPeriod;
  *
  * Output: list of [
  *   'country', 'campaign', 'sourceMedium', 'users', 'sessions', 'previousSessions', 'sessionsChange' (Compare::change),
- *   'averageSessionDuration',
+ *   'averageSessionDuration', 'engagementRate' (fraction),
  *   'bookingEngineVisits' (float|null: sessions that contain the booking event / reached the booking engine),
  *   'bookingEngineEvents' (float|null: eventCount under the same filter), 'purchasers', 'purchaseRevenue',
  *   'quality' (High Value|Potential|Low Intent|Low Data),
@@ -46,7 +46,7 @@ final class CountryPerformance
             'country_performance',
             $current,
             self::DIMENSIONS,
-            ['totalUsers', 'sessions', 'averageSessionDuration', 'totalPurchasers', 'purchaseRevenue'],
+            ['totalUsers', 'sessions', 'averageSessionDuration', 'engagementRate', 'totalPurchasers', 'purchaseRevenue'],
             null,
             [['field' => 'sessions', 'metric' => true, 'desc' => true]],
             $limit,
@@ -91,6 +91,7 @@ final class CountryPerformance
                 'previousSessions' => $previousSessions,
                 'sessionsChange' => Compare::change($m['sessions'] ?? 0.0, $previousSessions),
                 'averageSessionDuration' => $m['averageSessionDuration'] ?? 0.0,
+                'engagementRate' => $m['engagementRate'] ?? 0.0,
                 'bookingEngineVisits' => $bookingVisits,
                 'bookingEngineEvents' => $bookingEvents,
                 'purchasers' => $m['totalPurchasers'] ?? 0.0,

@@ -9,6 +9,7 @@ use App\Enums\DeliveryStatus;
 use App\Enums\ReportStatus;
 use App\Mail\ReportMail;
 use App\Models\Recipient;
+use App\Services\Reports\ChartRenderer;
 use App\Models\Report;
 use App\Models\ReportDelivery;
 use Illuminate\Bus\Queueable;
@@ -119,6 +120,10 @@ class BuildAndSendReport implements ShouldBeUnique, ShouldQueue
 
         $maxAttempts = (int) config('report.max_attempts');
 
+        // Charts are rendered once and shared by every recipient. A chart that fails is null (a table is shown instead);
+        // it can never fail the report.
+        $charts = app(ChartRenderer::class)->render($report->property, $report->period(), $report->payload ?? []);
+
         foreach ($recipients as $recipient) {
             $delivery = ReportDelivery::query()->firstOrCreate(
                 ['report_id' => $report->id, 'recipient_id' => $recipient->id],
@@ -130,7 +135,7 @@ class BuildAndSendReport implements ShouldBeUnique, ShouldQueue
             }
 
             try {
-                Mail::to($recipient->email)->send(new ReportMail($report, $report->property));
+                Mail::to($recipient->email)->send(new ReportMail($report, $report->property, $charts));
 
                 $delivery->forceFill([
                     'status' => DeliveryStatus::Sent->value,

@@ -1,0 +1,1 @@
+<span style="font-family:Arial, Helvetica, sans-serif; font-weight:bold; color:{{ $change['color'] }}; white-space:nowrap;">@if ($change['arrow'] !== ''){{ $change['arrow'] }} @endif{{ $change['text'] }}</span>

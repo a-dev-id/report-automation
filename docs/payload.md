@@ -49,6 +49,8 @@ meta
 
 site                    all values are metrics
   sessions, totalUsers, averageSessionDuration, purchases, purchaseRevenue
+  engagementRate        metric, a fraction (0.287 = 28.7%). GA4 engagementRate.
+  keyEvents             metric. GA4 keyEvents (events marked as key events in GA4).
   bookingEngineVisits   metric: sessions that reached the booking engine (hostname, path) or contained its event
                         (event). Same meaning for all three types. null when there is no booking_engine definition
   bookingEvents         metric: eventCount of the booking event. Only for booking_engine type "event"; null for
@@ -59,6 +61,7 @@ channels
   rows[]                top 6 by current sessions, then an "Other" row
     channel, isOther, sessions (metric), totalUsers (metric)
     averageSessionDuration   metric, seconds ('Other' is the sessions-weighted average of the rest)
+    engagementRate           metric, fraction ('Other' is the sessions-weighted average of the rest)
 
 countries
   total.sessions        metric (sum of all country rows, per range)
@@ -74,7 +77,7 @@ countries
 
 country_performance[]   current period, top 10 by sessions
   country, campaign, sourceMedium
-  users, sessions, averageSessionDuration, purchasers, purchaseRevenue
+  users, sessions, averageSessionDuration, engagementRate (fraction), purchasers, purchaseRevenue
   previousSessions      sessions of the same country + campaign + source in the previous period (0 if none)
   sessionsChange        Compare::change(sessions, previousSessions): {difference, percent, direction, improved}
                         (direction "new" when it had no sessions before). Compared with the previous period only,

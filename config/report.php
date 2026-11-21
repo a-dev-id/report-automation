@@ -115,6 +115,50 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Insight text (InsightGenerator)
+    |--------------------------------------------------------------------------
+    |   min_channel_sessions : a channel needs at least this many sessions (current + previous) to be named
+    |                          as the best or worst movement. Keeps tiny channels out of the headline.
+    |   min_country_sessions : a country needs at least this many sessions to be named as the top quality country.
+    |   max_bullets          : bullets under the headline (the insight has 3 to 5).
+    */
+    'insights' => [
+        'min_channel_sessions' => 50,
+        'min_country_sessions' => 100,
+        'max_bullets' => 5,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Where report files go
+    |--------------------------------------------------------------------------
+    | Chart PNGs ({slug}/{type}/{period_start}/) and previews (preview/). Tests point this at a throw-away folder so
+    | running them never touches real previews.
+    */
+    'reports_path' => storage_path('app/reports'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Charts (QuickChart PNGs)
+    |--------------------------------------------------------------------------
+    | Charts are rendered by POSTing a Chart.js config to QuickChart and stored under
+    | storage/app/reports/{slug}/{type}/{period_start}/. A chart failure never fails a report: the email falls back
+    | to a table. The data sent to QuickChart is only the numbers and labels in the chart (channel and country names,
+    | sessions), nothing that identifies a recipient.
+    */
+    'charts' => [
+        'enabled' => (bool) env('REPORT_CHARTS_ENABLED', true),
+        'base_url' => env('REPORT_CHARTS_BASE_URL', 'https://quickchart.io'),
+        'timeout' => (int) env('REPORT_CHARTS_TIMEOUT', 10),
+        'retries' => 1,
+        'width' => 600,
+        'device_pixel_ratio' => 2,
+        'neutral_color' => '#B0B7C3',
+        'default_color' => '#1F6F8B',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | AI referral sources
     |--------------------------------------------------------------------------
     | Regular expressions matched (case-insensitive, partial match) against the

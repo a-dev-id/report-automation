@@ -15,7 +15,7 @@ use App\Support\ReportPeriod;
  * Whole-site totals. Each value is a Compare::metric() array (current, previous, change and,
  * for monthly reports, yearAgo and yearAgoChange).
  *
- * Output: sessions, totalUsers, averageSessionDuration (seconds), purchases, purchaseRevenue (property currency),
+ * Output: sessions, totalUsers, engagementRate (fraction), keyEvents, averageSessionDuration (seconds), purchases, purchaseRevenue (property currency),
  * bookingEngineVisits (sessions that reached the booking engine or contained its event) and bookingEvents
  * (eventCount of the booking event). bookingEvents is only reported for the "event" booking type: for hostname
  * and path it would count every event there (page_view included), so it is null. Both are null when the
@@ -36,7 +36,7 @@ final class SiteTotals
             'site.totals',
             $ranges,
             [],
-            ['sessions', 'totalUsers', 'averageSessionDuration', 'ecommercePurchases', 'purchaseRevenue'],
+            ['sessions', 'totalUsers', 'engagementRate', 'keyEvents', 'averageSessionDuration', 'ecommercePurchases', 'purchaseRevenue'],
         ));
 
         $booking = BookingEngineFilter::fromProperty($property);
@@ -59,6 +59,8 @@ final class SiteTotals
         return [
             'sessions' => Ga4Rows::totalMetric($totals, $names, 'sessions'),
             'totalUsers' => Ga4Rows::totalMetric($totals, $names, 'totalUsers'),
+            'engagementRate' => Ga4Rows::totalMetric($totals, $names, 'engagementRate'),
+            'keyEvents' => Ga4Rows::totalMetric($totals, $names, 'keyEvents'),
             'averageSessionDuration' => Ga4Rows::totalMetric($totals, $names, 'averageSessionDuration'),
             'bookingEngineVisits' => $bookingVisits,
             'bookingEvents' => $bookingEvents,
