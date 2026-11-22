@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Reports;
 
+use App\Contracts\InsightGenerator;
 use App\Enums\ReportType;
 use App\Mail\ReportMail;
 use App\Models\Property;

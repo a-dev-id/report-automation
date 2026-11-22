@@ -23,6 +23,7 @@
     $thNum = $th.' text-align:right;';
     $td = $font.' font-size:14px; color:#111827; padding:8px 6px; border-bottom:1px solid #F0F1F3; vertical-align:top;';
     $num = $td.' text-align:right; white-space:nowrap;';
+    $numB = $num.' font-weight:bold;';   // a value shown with a change is bold
     $gap = fn (int $h) => '<tr><td height="'.$h.'" style="height:'.$h.'px; line-height:'.$h.'px; font-size:'.$h.'px;">&nbsp;</td></tr>';
     // A paragraph as a one-cell table, so the spacing is td padding (Outlook ignores padding on div and p).
     $para = fn (string $text, string $style = '', string $pad = '0') => '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="'
@@ -66,26 +67,31 @@
 
     {!! $gap(12) !!}
 
-    {{-- 1. Traffic Quality Insight --}}
-    @if (! empty($view['insight']['headline']))
+    {{-- 1. Traffic Quality Insight: verdict headline, titled paragraphs (what changed, what it means, what to check), priority, caution --}}
+    @if (! empty($view['insight']['headline']['text']))
     <tr><td bgcolor="#FFFFFF" style="background:#FFFFFF; border:1px solid #E5E7EB; border-left:5px solid {{ $brand }}; border-radius:6px; padding:20px 24px;">
         {!! $para('Traffic Quality Insight', 'font-size:13px; line-height:18px; font-weight:bold; letter-spacing:0.5px; text-transform:uppercase; color:'.$brand.';') !!}
-        {!! $para($view['insight']['headline'], 'font-size:17px; line-height:24px; font-weight:bold; color:#111827;', '8px 0 6px 0') !!}
-        @if (! empty($view['insight']['bullets']))
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="{{ $font }} font-size:16px; line-height:24px; font-weight:bold; color:#111827; padding:8px 0 4px 0;">{!! $view['insight']['headline']['html'] !!}</td></tr></table>
+        @foreach ($view['insight']['paragraphs'] as $paragraph)
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                @foreach ($view['insight']['bullets'] as $bullet)
-                    <tr>
-                        <td width="18" valign="top" style="{{ $font }} font-size:14px; line-height:21px; color:#1F2937; padding:0 0 6px 0;">&bull;</td>
-                        <td valign="top" style="{{ $font }} font-size:14px; line-height:21px; color:#1F2937; padding:0 0 6px 0;">{{ $bullet }}</td>
-                    </tr>
-                @endforeach
+                <tr><td style="{{ $font }} font-size:13px; line-height:18px; font-weight:bold; color:{{ $brand }}; padding:12px 0 2px 0;">{{ $paragraph['title'] }}</td></tr>
+                <tr><td style="{{ $font }} font-size:14px; line-height:21px; color:#1F2937; padding:0;">{!! $paragraph['html'] !!}</td></tr>
+            </table>
+        @endforeach
+        @if (! empty($view['insight']['priority']))
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td style="padding:14px 0 0 0;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr><td bgcolor="#F0F7FA" style="{{ $font }} background:#F0F7FA; border-left:3px solid {{ $brand }}; font-size:14px; line-height:21px; color:#111827; padding:10px 12px;">{!! $view['insight']['priority']['html'] !!}</td></tr>
+                    </table>
+                </td></tr>
             </table>
         @endif
         @if (! empty($view['insight']['caution']))
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr><td style="padding:8px 0 0 0;">
+                <tr><td style="padding:10px 0 0 0;">
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                        <tr><td bgcolor="#F9FAFB" style="{{ $font }} background:#F9FAFB; font-size:13px; line-height:19px; color:#4B5563; padding:10px 12px; border-radius:4px;">{{ $view['insight']['caution'] }}</td></tr>
+                        <tr><td bgcolor="#F9FAFB" style="{{ $font }} background:#F9FAFB; font-size:13px; line-height:19px; color:#4B5563; padding:10px 12px; border-radius:4px;">{!! $view['insight']['caution']['html'] !!}</td></tr>
                     </table>
                 </td></tr>
             </table>
@@ -93,7 +99,6 @@
     </td></tr>
     {!! $gap(12) !!}
     @endif
-
     {{-- 2. KPI tiles --}}
     @if (! empty($view['kpis']))
     <tr><td bgcolor="#FFFFFF" style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:12px 10px;">
@@ -162,16 +167,20 @@
                 </table>
             @endif
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr><th align="left" style="{{ $th }}">Channel</th><th align="right" style="{{ $thNum }}">Sessions</th><th align="right" style="{{ $thNum }}">Change</th><th align="right" style="{{ $thNum }}">Engagement</th></tr>
+                <tr><th align="left" style="{{ $th }}">Channel</th><th align="right" style="{{ $thNum }}">Share</th><th align="right" style="{{ $thNum }}">Sessions</th><th align="right" style="{{ $thNum }}">Change</th><th align="right" style="{{ $thNum }}">Engagement</th></tr>
                 @foreach ($view['channels']['rows'] as $row)
                     <tr>
                         <td style="{{ $td }}">{{ $row['name'] }}</td>
-                        <td align="right" style="{{ $num }}">{{ $row['sessions'] }}</td>
+                        <td align="right" style="{{ $num }}">{{ $row['share'] }}</td>
+                        <td align="right" style="{{ $numB }}">{{ $row['sessions'] }}</td>
                         <td align="right" style="{{ $num }}">@include('emails.partials.change', ['change' => $row['change']])</td>
                         <td align="right" style="{{ $num }}">{{ $row['engagement'] }}</td>
                     </tr>
                 @endforeach
             </table>
+            @if ($view['channels']['remaining'])
+                {!! $para($view['channels']['remaining'], 'font-size:13px; line-height:19px; color:#4B5563;', '8px 0 0 0') !!}
+            @endif
         @endif
     </td></tr>
     {!! $gap(12) !!}
@@ -184,21 +193,28 @@
             @include('emails.partials.heading', ['title' => $view['countries']['title'] ?? 'Top countries by engaged sessions'])
             @if ($view['countries']['unavailable'])
                 @include('emails.partials.unavailable')
-            @elseif ($view['countries']['hasChart'])
-                <img src="{{ $src($charts['countries']) }}" alt="Top countries by engaged sessions" width="592" height="{{ $view['countries']['imgHeight'] }}" style="display:block; width:100%; max-width:592px; height:auto; border:0; outline:none; text-decoration:none;">
             @else
+                @if ($view['countries']['hasChart'])
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr><td><img src="{{ $src($charts['countries']) }}" alt="Top countries by engaged sessions" width="592" height="{{ $view['countries']['imgHeight'] }}" style="display:block; width:100%; max-width:592px; height:auto; border:0; outline:none; text-decoration:none;"></td></tr>
+                        {!! $gap(12) !!}
+                    </table>
+                @endif
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                    <tr><th align="left" style="{{ $th }}">Country</th><th align="right" style="{{ $thNum }}">Engaged</th><th align="right" style="{{ $thNum }}">Sessions</th><th align="right" style="{{ $thNum }}">Share</th><th align="right" style="{{ $thNum }}">Change</th></tr>
+                    <tr><th align="left" style="{{ $th }}">Country</th><th align="right" style="{{ $thNum }}">Engaged</th><th align="right" style="{{ $thNum }}">Share</th><th align="right" style="{{ $thNum }}">Change</th><th align="right" style="{{ $thNum }}">Sessions</th></tr>
                     @foreach ($view['countries']['rows'] as $row)
                         <tr>
                             <td style="{{ $td }}">{{ $row['name'] }}</td>
-                            <td align="right" style="{{ $num }}">{{ $row['engaged'] }}</td>
-                            <td align="right" style="{{ $num }}">{{ $row['sessions'] }}</td>
+                            <td align="right" style="{{ $numB }}">{{ $row['engaged'] }}</td>
                             <td align="right" style="{{ $num }}">{{ $row['share'] }}</td>
                             <td align="right" style="{{ $num }}">@include('emails.partials.change', ['change' => $row['change']])</td>
+                            <td align="right" style="{{ $num }}">{{ $row['sessions'] }}</td>
                         </tr>
                     @endforeach
                 </table>
+                @if ($view['countries']['dropped'])
+                    {!! $para($view['countries']['dropped'], 'font-size:13px; line-height:19px; color:#4B5563;', '8px 0 0 0') !!}
+                @endif
             @endif
         @endif
 
@@ -212,7 +228,7 @@
             @else
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
-                        <th align="left" style="{{ $th }}">Country</th><th align="right" style="{{ $thNum }}">Sessions</th><th align="right" style="{{ $thNum }}">Engaged</th>
+                        <th align="left" style="{{ $th }}">Country</th><th align="right" style="{{ $thNum }}">Sessions</th><th align="right" style="{{ $thNum }}">Share</th><th align="right" style="{{ $thNum }}">Engaged</th>
                         <th align="right" style="{{ $thNum }}">Engagement</th><th align="right" style="{{ $thNum }}">Booking visits</th><th align="left" style="{{ $th }}">Quality</th>
                     </tr>
                     @foreach ($view['countryPerformance']['rows'] as $row)
@@ -221,6 +237,7 @@
                                 @if ($row['detail'] !== '')<br><span style="{{ $font }} font-size:13px; color:#6B7280;">{{ $row['detail'] }}</span>@endif
                             </td>
                             <td align="right" style="{{ $num }}">{{ $row['sessions'] }}</td>
+                            <td align="right" style="{{ $num }}">{{ $row['share'] }}</td>
                             <td align="right" style="{{ $num }}">{{ $row['engaged'] }}</td>
                             <td align="right" style="{{ $num }}">{{ $row['engagement'] }}</td>
                             <td align="right" style="{{ $num }}">{{ $row['bookingVisits'] }}</td>
@@ -248,7 +265,7 @@
                 @foreach ($view['paid']['rows'] as $row)
                     <tr>
                         <td style="{{ $td }}">{{ $row['label'] }}</td>
-                        <td align="right" style="{{ $num }}">{{ $row['value'] }}</td>
+                        <td align="right" style="{{ $numB }}">{{ $row['value'] }}</td>
                         <td align="right" style="{{ $num }}">{{ $row['previous'] }}</td>
                         <td align="right" style="{{ $num }}">@include('emails.partials.change', ['change' => $row['change']])</td>
                     </tr>
@@ -267,20 +284,35 @@
             @include('emails.partials.unavailable')
         @else
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr><th align="left" style="{{ $th }}">Source</th><th align="right" style="{{ $thNum }}">Sessions</th><th align="right" style="{{ $thNum }}">Change</th></tr>
+                <tr><th align="left" style="{{ $th }}">Assistant</th><th align="right" style="{{ $thNum }}">Share</th><th align="right" style="{{ $thNum }}">Sessions</th><th align="right" style="{{ $thNum }}">Change</th></tr>
                 @foreach ($view['ai']['rows'] as $row)
                     <tr>
                         <td style="{{ $td }}">{{ $row['source'] }}</td>
-                        <td align="right" style="{{ $num }}">{{ $row['sessions'] }}</td>
+                        <td align="right" style="{{ $num }}">{{ $row['share'] }}</td>
+                        <td align="right" style="{{ $numB }}">{{ $row['sessions'] }}</td>
                         <td align="right" style="{{ $num }}">@include('emails.partials.change', ['change' => $row['change']])</td>
                     </tr>
                 @endforeach
             </table>
-            @if ($view['ai']['countries'] !== '')
-                {!! $para('Top countries: '.$view['ai']['countries'], 'font-size:14px; line-height:20px; color:#374151;', '10px 0 0 0') !!}
+            @if (! empty($view['ai']['countryRows']))
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">{!! $gap(12) !!}</table>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr><th align="left" style="{{ $th }}">Top countries (AI traffic)</th><th align="right" style="{{ $thNum }}">Share</th><th align="right" style="{{ $thNum }}">Sessions</th><th align="right" style="{{ $thNum }}">Change</th></tr>
+                    @foreach ($view['ai']['countryRows'] as $row)
+                        <tr>
+                            <td style="{{ $td }}">{{ $row['name'] }}</td>
+                            <td align="right" style="{{ $num }}">{{ $row['share'] }}</td>
+                            <td align="right" style="{{ $numB }}">{{ $row['sessions'] }}</td>
+                            <td align="right" style="{{ $num }}">@include('emails.partials.change', ['change' => $row['change']])</td>
+                        </tr>
+                    @endforeach
+                </table>
+            @endif
+            @if ($view['ai']['dropped'])
+                {!! $para($view['ai']['dropped'], 'font-size:13px; line-height:19px; color:#4B5563;', '8px 0 0 0') !!}
             @endif
             @if ($view['ai']['pages'] !== '')
-                {!! $para('Top landing pages: '.$view['ai']['pages'], 'font-size:14px; line-height:20px; color:#374151;', '4px 0 0 0') !!}
+                {!! $para('Top landing pages: '.$view['ai']['pages'], 'font-size:14px; line-height:20px; color:#374151;', '8px 0 0 0') !!}
             @endif
         @endif
     </td></tr>
@@ -302,7 +334,7 @@
                                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                                     <tr><td bgcolor="#F9FAFB" style="background:#F9FAFB; border-radius:6px; padding:12px 14px;">
                                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                                            <tr><td style="{{ $font }} font-size:13px; line-height:18px; color:#6B7280;">{{ $tile['label'] }}</td></tr>
+                                            <tr><td style="{{ $font }} font-size:13px; line-height:18px; color:#6B7280;">{{ $tile['label'] }}@if ($tile['hint']) ({{ $tile['hint'] }})@endif</td></tr>
                                             <tr><td style="{{ $font }} font-size:22px; line-height:28px; font-weight:bold; color:#111827; padding:2px 0;">{{ $tile['value'] }}</td></tr>
                                             <tr><td style="{{ $font }} font-size:14px; line-height:20px;">@include('emails.partials.change', ['change' => $tile['change']])<span style="color:#6B7280;"> vs {{ $view['previousLabel'] }}</span></td></tr>
                                         </table>
@@ -314,6 +346,10 @@
                 @endforeach
             </table>
 
+            @if ($view['searchConsole']['brandLine'])
+                {!! $para($view['searchConsole']['brandLine'], 'font-size:14px; line-height:20px; color:#374151;', '8px 0 0 0') !!}
+            @endif
+
             @foreach ([['Top queries', 'queries'], ['Top pages', 'pages']] as [$label, $key])
                 @if (! empty($view['searchConsole'][$key]))
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">{!! $gap(12) !!}</table>
@@ -322,7 +358,7 @@
                         @foreach ($view['searchConsole'][$key] as $row)
                             <tr>
                                 <td style="{{ $td }} word-break:break-word;">{{ $row['name'] }}</td>
-                                <td align="right" style="{{ $num }}">{{ $row['clicks'] }}</td>
+                                <td align="right" style="{{ $numB }}">{{ $row['clicks'] }}</td>
                                 <td align="right" style="{{ $num }}">{{ $row['impressions'] }}</td>
                                 <td align="right" style="{{ $num }}">{{ $row['position'] }}</td>
                             </tr>

@@ -85,7 +85,7 @@ class EmailRobustnessTest extends TestCase
         $preheader = html_entity_decode(trim(preg_replace('/(&nbsp;|&zwnj;)+/', '', $m[2])), ENT_QUOTES | ENT_HTML5);
         $this->assertNotSame('', $preheader);
         $this->assertLessThanOrEqual(90, mb_strlen($preheader));
-        $this->assertStringStartsWith('This week, sessions rose 25.0% to 10,000', $preheader);
+        $this->assertStringStartsWith('This week is best described as healthy growth: sessions rose ▲ +25.0% to 10,000', $preheader);
     }
 
     public function test_the_preheader_is_at_most_90_characters_and_cut_at_a_word(): void

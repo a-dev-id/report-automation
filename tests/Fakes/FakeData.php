@@ -116,7 +116,7 @@ final class FakeData
             ],
             'countries' => [
                 'current' => $countries(['Indonesia' => 3000, 'Australia' => 1800, 'United States' => 1200, 'United Kingdom' => 900, 'Germany' => 700, 'France' => 500, 'Singapore' => 400, 'Netherlands' => 350, 'Canada' => 350, 'India' => 300, 'Japan' => 250, 'Brazil' => 250]),
-                'previous' => $countries(['Indonesia' => 2600, 'Australia' => 1200, 'United States' => 1000, 'United Kingdom' => 800, 'Germany' => 500, 'France' => 400, 'Singapore' => 350, 'Netherlands' => 300, 'Canada' => 250, 'India' => 250, 'Japan' => 200, 'Brazil' => 150]),
+                'previous' => $countries(['Indonesia' => 2600, 'Australia' => 1200, 'United States' => 1000, 'United Kingdom' => 800, 'Germany' => 500, 'France' => 400, 'Singapore' => 350, 'Netherlands' => 300, 'Canada' => 250, 'India' => 100, 'Japan' => 200, 'Brazil' => 300]),
                 'yearAgo' => $countries(['Indonesia' => 2000, 'Australia' => 1000, 'United States' => 800, 'United Kingdom' => 500, 'Germany' => 300, 'France' => 200, 'Singapore' => 200]),
             ],
             'country_performance' => [
@@ -156,6 +156,12 @@ final class FakeData
             ],
             'ai.countries' => [
                 'current' => array_map(fn ($s, $n) => $r(['country' => $s], ['sessions' => $n]), ['United States', 'Indonesia', 'Australia', 'Germany'], [70, 50, 30, 25]),
+                'previous' => array_map(fn ($s, $n) => $r(['country' => $s], ['sessions' => $n]), ['United States', 'Germany', 'Australia', 'France'], [60, 55, 20, 10]),
+            ],
+            // Purchases and revenue from the paid channels. No row for the previous period = none then.
+            'paid.conversions' => [
+                'current' => [$r([], ['ecommercePurchases' => 2, 'purchaseRevenue' => 9000000])],
+                'previous' => [],
             ],
             'ai.landing_pages' => [
                 'current' => array_map(fn ($s, $n) => $r(['landingPage' => $s], ['sessions' => $n]), ['/', '/rooms', '/spa', '/blog'], [90, 60, 40, 10]),
@@ -191,6 +197,8 @@ final class FakeData
                 'ubud honeymoon' => [6, 700, 22.0], 'ubud cheap' => [4, 600, 25.0], 'ubud hostel' => [1, 500, 30.0],
             ]),
             'queries.previous' => $queries(['nandini ubud' => [160, 3800, 1.4], 'ubud villa' => [100, 4800, 5.0]]),
+            'brand.current' => $queries(['nandini ubud' => [200, 4000, 1.2], 'ubud villa' => [120, 5000, 4.5], 'nandini spa' => [30, 900, 3.0], 'ubud spa' => [60, 3000, 8.0], 'best hotel ubud' => [40, 2500, 9.0]]),
+            'brand.previous' => $queries(['nandini ubud' => [160, 3800, 1.4], 'ubud villa' => [100, 4800, 5.0], 'nandini spa' => [20, 700, 3.2], 'ubud spa' => [50, 2800, 8.5]]),
             'pages.current' => array_map(
                 fn ($p, $v) => $row([$p], $v[0], $v[1], $v[2]),
                 ['https://nandini.test/', 'https://nandini.test/rooms', 'https://nandini.test/spa', 'https://nandini.test/blog', 'https://nandini.test/offers', 'https://nandini.test/contact'],

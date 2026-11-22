@@ -13,34 +13,62 @@ The report email is built from the payload (see `payload.md`) in four steps, all
 for example `Nandini Weekly Traffic Report: 9 to 15 Nov 2026`. `BuildAndSendReport` renders the charts once and gives
 the same files to every recipient.
 
-## Insight rules
+## Traffic Quality Insight
 
-Thresholds are in `config/report.php` under `insights`. Wording differs for weekly ("this week", "the previous week") and
-monthly ("this month", "last month", plus a year-ago clause).
+The insight is written for a hotel manager. Every paragraph says what changed (with the key numbers), what it means and, when
+useful, one thing to check. It is rule based (no external API) and sits behind `App\Contracts\InsightGenerator`, bound to
+`App\Services\Reports\Insight\RuleBasedInsightGenerator` in `ReportServiceProvider`. An AI-written version can replace it by
+changing that one binding: it only has to return the same shape (`verdict`, `headline`, `paragraphs`, `priority`, `caution`).
 
-- **Headline:** sessions and key events against the previous period; monthly adds the same month last year.
-- **Large-change guard** (`insights.large_drop_percent` 60, `insights.large_rise_percent` 200): a metric that moved by more than that
-  against its comparison period is not stated as a fact. The headline leaves it out (sessions always stay, as a plain value),
-  bullets give only the previous value and point to the note, and the caution gets one neutral sentence, for example: "Key
-  events changed by -89.7% versus October 2025. A change this large often comes from a change in how events are tracked, so
-  please check the tracking setup before drawing conclusions." The KPI tile still shows the real number and arrow. A zero or
-  missing previous value has no percent and is never guarded.
-- **Bullets, in this order, each only if its data exists:** channel movement (largest gain and largest loss in sessions, among
-  channels with at least `min_channel_sessions`), booking engine (visits, share of sessions, the previous rate), the country with
-  the best traffic quality, purchases and revenue (in the property currency), and AI traffic when above 0. If fewer than 3 bullets
-  exist, engagement rate and users fill in. At most `max_bullets`.
-- **Best traffic quality country:** not the biggest one. Rows are summed per country and ranked by booking-engine visits (and
-  purchasers) per session; "Low Data" rows and rows flagged "check for bots" are ignored. The sentence is only written when the
-  winner has at least `min_country_sessions` (50) sessions AND a booking-engine rate or purchase rate above
-  `min_country_rate_percent` (1%). Otherwise it is left out, and nothing replaces it. When it is written and a different
-  country is the biggest, it says "The largest country by sessions was X" and adds "the engaged-sessions leader was Y" if that
-  differs from X. Both names come from `countries.largestBySessions` and `countries.engagedLeader`, which look at all countries, not only
-the rows shown. The booking and purchase rates are measured on the country's rows in the Country performance table (its top traffic
-sources), which is why the sentence says "top-source sessions".
-- **Caution:** one neutral line when `quality_alerts` is not empty. It says what was found and that the figures should be read
-  with care. The data is never hidden.
-- A zero or missing previous value never divides: the text says "none before" or "no comparison available". A section that is
-  missing or is an `{error}` object is skipped.
+**Structure**
+
+1. **Headline**: one sentence verdict, chosen from *healthy growth*, *growth with weaker quality*, *a decline*, *stable* or *mixed*.
+   It looks at sessions, engagement rate and booking-engine visits together (`insight.verdict.*`), never at one metric.
+2. **Paragraphs**, each with a bold title, in this order, skipped when the section has no data: Advertising, Website traffic,
+   Where visitors came from, Countries, AI assistants, Search Console.
+3. **Priority:** the one or two most useful actions from the rules that fired (most urgent first).
+4. **Caution:** one neutral paragraph (see Guards).
+
+About 350 words for a weekly report and 400 for a monthly one (`insight.max_words`). When the text is too long the least important
+optional sentences are dropped first; the first sentence of each paragraph and the AI "meaning" line are never dropped.
+"This week" or "This month" wording follows the report type; monthly also compares with the same month last year.
+
+**Rules** (one small class per section in `app/Services/Reports/Insight/`, each rule returns a sentence and an optional action; all
+thresholds are in `config/report.php` under `insight`)
+
+| Section | Rules |
+|---|---|
+| Advertising | impressions up + clicks down + CTR down = reached more people but fewer responded (review placements and creative); clicks up but CTR down; impressions and clicks both down = reach shrank; cost up with no purchases = spend without bookings, judge by booking-engine visits; clicks up + cost per click down = more efficient; cost per click up = less efficient; display or awareness campaigns = awareness, not demand |
+| Website traffic | sessions up while engagement or session duration is down = growth from lower-quality traffic (names the channel that grew most); sessions down while engagement is up = fewer but more interested visitors; sessions up while booking-engine visits are flat or down = check the booking button and landing pages; booking-engine rate up or down and what it means; purchases or revenue under `small_numbers.min_purchases` (5) in both periods = "numbers are small", not a trend; monthly: against the same month last year |
+| Where visitors came from | the largest sources with their share and "the remaining X% came from ..."; one channel above `dominant_channel.min_share_percent` (40%) with engagement under 25% or an average visit under the bot threshold = likely automated or low-quality traffic (check bot and referral filtering in GA4); a share that moved by more than `share_move_points` (10) |
+| Countries | ranked by engaged sessions; new countries in the top list judged genuine (engagement and booking activity), suspicious (very low engagement, no booking activity) or "needs a closer look"; countries that dropped out; `priority_countries` combined share (when set); rows flagged for bots; the best traffic quality country |
+| AI assistants | only above `ai.min_sessions` (20): top assistant and share, new assistants, top countries with share and "New", dropped countries, and what it means |
+| Search Console | impressions up + clicks down = shown more but clicked less (with the position change); both up or both down = visibility improved or weakened; `brand_terms` share of clicks (skipped when empty); the data-through date when truncated |
+
+**Guards**
+
+- **Large-change guard** (`insight.large_drop_percent` 60, `insight.large_rise_percent` 200): a metric that moved by more than that is not
+  stated as a fact and no rule interprets it. The caution says, for example: "Key events changed by -89.7% versus October 2025. A
+  change this large often comes from a change in how events are tracked, so please check the tracking setup before drawing
+  conclusions." The KPI tile still shows the real number and arrow. A zero or missing previous value has no percent and is never
+  guarded ("new this period" or "no comparison available").
+- **Best traffic quality country** is only named when the winner has at least `min_country_sessions` (50) sessions AND a booking-engine
+  or purchase rate above `min_country_rate_percent` (1%). Otherwise nothing replaces it. The rates are measured on the country's rows in the
+  Country performance table (its top traffic sources), so the sentence says "top-source sessions". "Largest by sessions" and the
+  engaged-sessions leader come from `countries.largestBySessions` and `countries.engagedLeader`, which look at all countries.
+- **quality_alerts** from the payload become one neutral "Data note" in the caution.
+
+**Optional settings** (`config/report.php`, per hotel under `insight.properties.{slug}`)
+
+- `insight.brand_terms` (or `REPORT_INSIGHT_BRAND_TERMS=nandini,nandini bali`): words that mark a brand search. Needs one extra Search
+  Console query per period. Empty = skipped.
+- `insight.priority_countries`: your priority markets, for their combined share of engaged sessions.
+
+**Number styling.** Every value shown with a change is bold. A positive change is green (#15803D), a negative one red (#B91C1C), zero gray
+(#6B7280) and "New" blue-gray (#475569); the arrow and the + or - sign are always shown, so meaning never depends on color. Search
+Console position is inverted (a lower number is better, so a drop is green). Metrics in `styling.neutral_metrics` (ad cost, cost per
+click) are always gray. In the insight text the numbers and changes are bold colored inline spans; the plain-text version has no colors
+and keeps the signs.
 
 ## Charts
 
@@ -58,7 +86,8 @@ sources), which is why the sentence says "top-source sessions".
 
 ## Sections of the email
 
-Insight, KPI tiles (sessions, users, engagement rate, key events, purchases and revenue when present; monthly adds vs year ago),
+Insight, KPI tiles (sessions, users, engagement rate, average session duration, key events, purchases and revenue when present; monthly adds
+vs year ago),
 trend, channels (chart and table), "Top countries by engaged sessions" (chart) and the Country performance table (Sessions,
 Engaged, Engagement, Booking visits, Quality and the "check for bots" flag; ranked by engaged sessions), Paid (only with data), AI traffic (only with
 data), Search Console (tiles, top 5 queries and pages), Data notes. A section whose payload value is an `{error}` object shows

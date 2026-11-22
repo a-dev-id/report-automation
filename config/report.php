@@ -115,27 +115,75 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Insight text (InsightGenerator)
+    | Traffic Quality Insight (rule-based, see App\Services\Reports\Insight)
     |--------------------------------------------------------------------------
-    |   min_channel_sessions : a channel needs at least this many sessions (current + previous) to be named
-    |                          as the best or worst movement. Keeps tiny channels out of the headline.
-    |   min_country_sessions : the "best traffic quality" country needs at least this many sessions...
-    |   min_country_rate_percent : ...and a booking-engine rate or a purchase rate above this percent. If the winner
-    |                          does not meet both, the sentence is left out.
-    |   max_bullets          : bullets under the headline (the insight has 3 to 5).
-    |   large_drop_percent / large_rise_percent : a metric that moved by more than this versus its comparison period is
-    |                          not stated as a fact in the headline. The insight adds a neutral note to check the tracking
-    |                          setup instead (a change that large is often a tracking change). The KPI tile still shows the real number.
+    | Every rule reads its thresholds from here. Per-property overrides go under properties.{slug}.{key}, for example
+    | 'properties' => ['nandini' => ['brand_terms' => ['nandini']]].
+    |
+    | Guards
+    |   large_drop_percent / large_rise_percent : a metric that moved by more than this versus its comparison period is not
+    |       stated as a fact. A neutral note asks to check the tracking setup instead. The KPI tile still shows the real number.
+    |   min_country_sessions, min_country_rate_percent : the "best traffic quality" country is only named when the winner
+    |       has at least this many sessions and a booking-engine or purchase rate above this percent.
+    |   small_numbers.min_purchases : fewer purchases than this in either period = "numbers are small", not a trend.
+    | Length
+    |   max_words : weekly and monthly word limits; the least important optional sentences are dropped to fit.
+    | Verdict (headline)
+    |   verdict.stable_percent : sessions within +/- this percent are "stable".
+    |   verdict.engagement_points : engagement rate must move by this many points to count as better or worse.
+    |   verdict.booking_percent : booking-engine visits must move by this percent to count as up or down.
+    | Rules
+    |   min_channel_sessions : a channel needs this many sessions (current + previous) to be named as a mover.
+    |   dominant_channel : a channel above min_share_percent of sessions with an engagement rate under max_engagement_percent
+    |       (or an average session shorter than traffic_quality.bot_check.max_avg_session_seconds) is flagged as likely
+    |       automated or low-quality traffic.
+    |   share_move_points : a channel share that moved by more than this many points gets a sentence.
+    |   suspicious_engagement_percent : a country that entered the top list below this engagement, with no booking activity, is
+    |       called suspicious.
+    |   ai.min_sessions : the AI assistants paragraph needs at least this many sessions.
+    |   awareness_terms : campaign names containing one of these are described as awareness, not demand.
+    |   priority_countries : your priority markets (names as GA4 spells them). Empty = skipped.
+    |   brand_terms : words that mark a brand search query (for Search Console). Empty = brand share is skipped.
+    |       REPORT_INSIGHT_BRAND_TERMS can hold a comma separated list.
     */
-    'insights' => [
+    'insight' => [
         'min_channel_sessions' => 50,
         'min_country_sessions' => 50,
         'min_country_rate_percent' => 1.0,
-        'max_bullets' => 5,
         'large_drop_percent' => 60,
         'large_rise_percent' => 200,
+        'small_numbers' => ['min_purchases' => 5],
+        'max_words' => ['weekly' => 350, 'monthly' => 400],
+        'verdict' => ['stable_percent' => 5.0, 'engagement_points' => 2.0, 'booking_percent' => 5.0],
+        'dominant_channel' => ['min_share_percent' => 40, 'max_engagement_percent' => 25],
+        'share_move_points' => 10,
+        'suspicious_engagement_percent' => 20,
+        'ai' => ['min_sessions' => 20],
+        'awareness_terms' => ['awareness', 'display', 'reach', 'video'],
+        'priority_countries' => [],
+        'brand_terms' => array_values(array_filter(array_map('trim', explode(',', (string) env('REPORT_INSIGHT_BRAND_TERMS', ''))))),
+        'properties' => [],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Number styling (email)
+    |--------------------------------------------------------------------------
+    | A change is green when positive and red when negative (so is its arrow and +/- sign, which also carry the meaning
+    | without color; a metric where lower is better, like Search Console position, is inverted). A change of 0 is gray
+    | and "new" is blue-gray. Metrics listed in neutral_metrics are always gray: more ad spend is not good or bad by itself.
+    */
+    'styling' => [
+        'neutral_metrics' => ['cost', 'costPerClick'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Paid channels
+    |--------------------------------------------------------------------------
+    | GA4 default channel groups whose purchases and revenue count as "advertising" in the Paid section.
+    */
+    'paid_channels' => ['Paid Search', 'Paid Social', 'Paid Video', 'Paid Shopping', 'Paid Other', 'Display', 'Cross-network'],
     /*
     |--------------------------------------------------------------------------
     | Where report files go

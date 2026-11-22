@@ -14,7 +14,11 @@ use App\Support\ReportPeriod;
  * Sessions and users by default channel group: the top N channels by current sessions (config
  * report.top.channels) and an "Other" row that sums the rest.
  *
- * Output: ['total' => ['sessions' => metric], 'rows' => [['channel', 'isOther', 'sessions' => metric, 'totalUsers' => metric,
+ * share is the channel's percent of all sessions in that range, shareChange its move in percentage points.
+ * otherChannels names the channels that were folded into "Other" (current period), so text can say what the
+ * remaining share came from.
+ *
+ * Output: ['total' => ['sessions' => metric], 'otherChannels' => [['channel', 'sessions', 'share']], 'rows' => [['channel', 'isOther', 'share', 'shareChange', 'sessions' => metric, 'totalUsers' => metric,
  *   'averageSessionDuration' => metric (seconds), 'engagementRate' => metric (fraction)]; for "Other" both are
  *   sessions-weighted averages of the rest], ...]]
  */
@@ -58,12 +62,23 @@ final class TrafficByChannel
         $groups = Ga4Rows::sortByCurrent(Ga4Rows::group($result, ['sessionDefaultChannelGroup']), 'sessions');
         $top = array_slice($groups, 0, Ga4Rows::topN('channels', $period), true);
         $rest = array_diff_key($groups, $top);
+        $totals = Ga4Rows::sum($groups, $names, 'sessions');
+        $shares = function (array $sessionsByRange) use ($totals): array {
+            $out = [];
+            foreach ($sessionsByRange as $range => $value) {
+                $out[$range] = $totals[$range] > 0 ? round($value / $totals[$range] * 100, 2) : null;
+            }
+
+            return $out;
+        };
 
         $rows = [];
         foreach ($top as $group) {
             $rows[] = [
                 'channel' => $group['dimensions']['sessionDefaultChannelGroup'],
                 'isOther' => false,
+                'share' => $share = $shares(array_combine($names, array_map(fn ($r) => Ga4Rows::value($group, $r, 'sessions'), $names))),
+                'shareChange' => self::shareChange($share),
                 'sessions' => Ga4Rows::groupMetric($group, $names, 'sessions'),
                 'totalUsers' => Ga4Rows::groupMetric($group, $names, 'totalUsers'),
                 'averageSessionDuration' => Ga4Rows::groupMetric($group, $names, 'averageSessionDuration'),
@@ -75,6 +90,8 @@ final class TrafficByChannel
             $rows[] = [
                 'channel' => 'Other',
                 'isOther' => true,
+                'share' => $share = $shares(Ga4Rows::sum($rest, $names, 'sessions')),
+                'shareChange' => self::shareChange($share),
                 'sessions' => \App\Support\Compare::metric(Ga4Rows::sum($rest, $names, 'sessions')),
                 'totalUsers' => \App\Support\Compare::metric(Ga4Rows::sum($rest, $names, 'totalUsers')),
                 'averageSessionDuration' => \App\Support\Compare::metric(self::weighted($rest, $names, 'averageSessionDuration')),
@@ -82,9 +99,33 @@ final class TrafficByChannel
             ];
         }
 
+        $others = [];
+        foreach ($rest as $group) {
+            $sessions = Ga4Rows::value($group, 'current', 'sessions');
+            if ($sessions > 0) {
+                $others[] = [
+                    'channel' => $group['dimensions']['sessionDefaultChannelGroup'],
+                    'sessions' => $sessions,
+                    'share' => $totals['current'] > 0 ? round($sessions / $totals['current'] * 100, 2) : null,
+                ];
+            }
+        }
+
         return [
-            'total' => ['sessions' => \App\Support\Compare::metric(Ga4Rows::sum($groups, $names, 'sessions'))],
+            'total' => ['sessions' => \App\Support\Compare::metric($totals)],
+            'otherChannels' => $others,
             'rows' => $rows,
         ];
+    }
+
+    /** @param  array<string, float|null>  $share */
+    private static function shareChange(array $share): array
+    {
+        $change = ['previous' => \App\Support\Compare::points($share['current'] ?? null, $share['previous'] ?? null)];
+        if (array_key_exists('yearAgo', $share)) {
+            $change['yearAgo'] = \App\Support\Compare::points($share['current'] ?? null, $share['yearAgo']);
+        }
+
+        return $change;
     }
 }

@@ -7,6 +7,7 @@ namespace App\Services\Reports;
 use App\Models\Property;
 use App\Support\ReportFormat;
 use App\Support\ReportPeriod;
+use App\Support\Rich;
 use DateTimeImmutable;
 use DateTimeZone;
 
@@ -15,9 +16,10 @@ use DateTimeZone;
  * always show the same numbers. Everything here is already a display string.
  *
  * A section whose payload value is an {error} object becomes ['unavailable' => true]. A section with no data
- * is null and is left out of the email.
+ * is null and is left out of the email. A metric the property does not have is left out, never shown as zero.
  *
- * @phpstan-type Change array{text: string, arrow: string, color: string, direction: string}
+ * Changes are arrays from ReportFormat::change() (text, arrow, color, kind): green for positive, red for negative,
+ * gray for zero, blue-gray for "New", gray for the neutral metrics in config report.styling.neutral_metrics.
  */
 final class ReportViewData
 {
@@ -30,7 +32,7 @@ final class ReportViewData
 
     /**
      * @param  array<string, mixed>  $payload
-     * @param  array{headline: string, bullets: list<string>, caution: string|null}  $insight
+     * @param  array<string, mixed>  $insight  from App\Contracts\InsightGenerator (headline, paragraphs, priority, caution)
      * @param  array<string, string|null>  $charts  chart name => PNG path or null
      * @return array<string, mixed>
      */
@@ -40,27 +42,29 @@ final class ReportViewData
         $currency = (string) ($property->currency ?: ($payload['meta']['currency'] ?? ''));
         $previousLabel = $monthly ? 'last month' : 'last week';
         $yearAgoLabel = $period->yearAgoStart !== null ? $period->yearAgoStart->format('M Y') : null;
+        $brand = preg_match('/^#[0-9a-fA-F]{6}$/', (string) $property->brand_color) ? (string) $property->brand_color : self::DEFAULT_COLOR;
 
         $trend = self::trend($payload, $charts);
         $channels = self::channels($payload, $charts);
         $countries = self::countries($payload, $charts);
         $searchConsole = self::searchConsole($payload);
+        $insightView = self::insight($insight);
 
         return [
             'propertyName' => $property->name,
             'language' => $property->language ?: 'en',
-            'brandColor' => preg_match('/^#[0-9a-fA-F]{6}$/', (string) $property->brand_color) ? (string) $property->brand_color : self::DEFAULT_COLOR,
+            'brandColor' => $brand,
             'logoPath' => $logoPath,
             'logoHeight' => self::imageHeight($logoPath, 56, 56),
-            'headerTextColor' => self::readableTextOn(preg_match('/^#[0-9a-fA-F]{6}$/', (string) $property->brand_color) ? (string) $property->brand_color : self::DEFAULT_COLOR),
-            'preheader' => self::preheader((string) ($insight['headline'] ?? '')),
+            'headerTextColor' => self::readableTextOn($brand),
+            'preheader' => self::preheader($insightView['headline']['text'] ?? ''),
             'title' => ucfirst($period->type->value).' Traffic Report',
             'periodLabel' => $period->label(),
             'subject' => self::subject($property, $period),
             'monthly' => $monthly,
             'previousLabel' => $previousLabel,
             'yearAgoLabel' => $yearAgoLabel,
-            'insight' => $insight,
+            'insight' => $insightView,
             'kpis' => self::kpis($payload, $currency, $monthly),
             'trend' => $trend,
             'channels' => $channels,
@@ -77,6 +81,28 @@ final class ReportViewData
 
     // ----------------------------------------------------------------------------------------------
 
+    /**
+     * The insight in both renderings: HTML (bold, colored inline spans) and plain text (no color, signs kept).
+     *
+     * @param  array<string, mixed>  $insight
+     * @return array<string, mixed>
+     */
+    private static function insight(array $insight): array
+    {
+        $both = fn (string $markup) => ['html' => Rich::toHtml($markup), 'text' => Rich::toPlain($markup)];
+
+        $priority = isset($insight['priority']) && $insight['priority'] !== ''
+            ? $both(preg_replace('/^Priority:/', '⟦b|Priority:⟧', (string) $insight['priority']) ?? (string) $insight['priority'])
+            : null;
+
+        return [
+            'headline' => $both((string) ($insight['headline'] ?? '')),
+            'paragraphs' => array_map(fn (array $p) => ['title' => (string) $p['title']] + $both((string) $p['text']), $insight['paragraphs'] ?? []),
+            'priority' => $priority,
+            'caution' => isset($insight['caution']) && $insight['caution'] !== '' ? $both((string) $insight['caution']) : null,
+        ];
+    }
+
     /** @return list<array<string, mixed>> */
     private static function kpis(array $payload, string $currency, bool $monthly): array
     {
@@ -89,6 +115,7 @@ final class ReportViewData
             ['sessions', 'Sessions', fn ($v) => ReportFormat::number($v), false, false],
             ['totalUsers', 'Users', fn ($v) => ReportFormat::number($v), false, false],
             ['engagementRate', 'Engagement rate', fn ($v) => ReportFormat::rate($v), true, false],
+            ['averageSessionDuration', 'Avg. session duration', fn ($v) => ReportFormat::duration($v), false, false],
             ['keyEvents', 'Key events', fn ($v) => ReportFormat::number($v), false, false],
             ['purchases', 'Purchases', fn ($v) => ReportFormat::number($v), false, true],
             ['purchaseRevenue', 'Revenue', fn ($v) => ReportFormat::money($v, $currency), false, true],
@@ -104,7 +131,7 @@ final class ReportViewData
                 continue;
             }
 
-            $change = fn (?array $c) => $isRate ? ReportFormat::rateChange($c) : ReportFormat::change($c);
+            $change = fn (?array $c) => $isRate ? ReportFormat::rateChange($c, $key) : ReportFormat::change($c, $key);
             $tiles[] = [
                 'label' => $label,
                 'value' => $format($m['current']),
@@ -153,14 +180,27 @@ final class ReportViewData
             return null;
         }
 
+        $others = array_values(array_filter((array) ($channels['otherChannels'] ?? []), fn (array $o) => ($o['share'] ?? 0) > 0));
+        $remaining = null;
+        if ($others !== []) {
+            $names = array_slice(array_column($others, 'channel'), 0, 3);
+            $last = array_pop($names);
+            $list = count($others) > 3
+                ? implode(', ', array_merge($names, [$last])).' and smaller channels'
+                : ($names === [] ? $last : implode(', ', $names).' and '.$last);
+            $remaining = 'The remaining '.ReportFormat::percent(array_sum(array_column($others, 'share'))).' (shown as Other) came from '.$list.'.';
+        }
+
         return [
             'unavailable' => false,
             'hasChart' => ($charts['channels'] ?? null) !== null,
             'imgHeight' => self::imageHeight($charts['channels'] ?? null, 592, 300),
+            'remaining' => $remaining,
             'rows' => array_map(fn (array $r) => [
                 'name' => (string) $r['channel'],
+                'share' => isset($r['share']['current']) ? ReportFormat::percent($r['share']['current']) : '–',
                 'sessions' => ReportFormat::number($r['sessions']['current']),
-                'change' => ReportFormat::change($r['sessions']['change'] ?? null),
+                'change' => ReportFormat::change($r['sessions']['change'] ?? null, 'sessions'),
                 'engagement' => isset($r['engagementRate']) ? ReportFormat::rate($r['engagementRate']['current']) : '–',
             ], $channels['rows']),
         ];
@@ -177,18 +217,21 @@ final class ReportViewData
             return null;
         }
 
+        $dropped = array_values((array) ($countries['dropped'] ?? []));
+
         return [
             'unavailable' => false,
             'hasChart' => ($charts['countries'] ?? null) !== null,
             'imgHeight' => self::imageHeight($charts['countries'] ?? null, 592, 400),
             // The chart carries its own title ("Top countries by engaged sessions"), so the section heading is not repeated above it.
             'title' => ($charts['countries'] ?? null) !== null ? 'Top countries' : 'Top countries by engaged sessions',
+            'dropped' => $dropped === [] ? null : 'Dropped from the current top countries: '.implode(', ', $dropped).'.',
             'rows' => array_map(fn (array $r) => [
                 'name' => (string) $r['country'],
                 'engaged' => ReportFormat::number($r['engagedSessions']['current'] ?? null),
                 'sessions' => ReportFormat::number($r['sessions']['current']),
-                'share' => ReportFormat::percent($r['share']['current'] ?? null),
-                'change' => ReportFormat::change($r['sessions']['change'] ?? null),
+                'share' => isset($r['engagedShare']['current']) ? ReportFormat::percent($r['engagedShare']['current']) : '–',
+                'change' => ReportFormat::change($r['engagedSessions']['change'] ?? null, 'engagedSessions'),
             ], $countries['rows']),
         ];
     }
@@ -204,9 +247,11 @@ final class ReportViewData
             return null;
         }
 
+        $siteSessions = (float) ($payload['site']['sessions']['current'] ?? 0);
+
         return [
             'unavailable' => false,
-            'rows' => array_map(function (array $r) {
+            'rows' => array_map(function (array $r) use ($siteSessions) {
                 $campaign = (string) ($r['campaign'] ?? '');
                 $detail = trim((string) ($r['sourceMedium'] ?? '').($campaign !== '' && ! str_starts_with($campaign, '(') ? ' · '.$campaign : ''));
 
@@ -214,6 +259,7 @@ final class ReportViewData
                     'country' => (string) $r['country'],
                     'detail' => $detail,
                     'sessions' => ReportFormat::number($r['sessions']),
+                    'share' => $siteSessions > 0 ? ReportFormat::percent((float) $r['sessions'] / $siteSessions * 100) : '–',
                     'engaged' => ReportFormat::number($r['engagedSessions'] ?? null),
                     'engagement' => isset($r['engagementRate']) ? ReportFormat::rate($r['engagementRate']) : '–',
                     'bookingVisits' => ($r['bookingEngineVisits'] ?? null) === null ? '–' : ReportFormat::number($r['bookingEngineVisits']),
@@ -241,11 +287,12 @@ final class ReportViewData
         }
 
         $currency = (string) ($paid['currency'] ?? '');
+        // A metric GA4 did not provide is left out of the table (never shown as zero).
         $row = fn (string $label, string $key, callable $format, bool $isRate = false) => isset($m[$key]) ? [
             'label' => $label,
             'value' => $format($m[$key]['current'] ?? null),
             'previous' => $format($m[$key]['previous'] ?? null),
-            'change' => $isRate ? ReportFormat::rateChange($m[$key]['change'] ?? null) : ReportFormat::change($m[$key]['change'] ?? null),
+            'change' => $isRate ? ReportFormat::rateChange($m[$key]['change'] ?? null, $key) : ReportFormat::change($m[$key]['change'] ?? null, $key),
         ] : null;
 
         return [
@@ -254,21 +301,13 @@ final class ReportViewData
             'rows' => array_values(array_filter([
                 $row('Impressions', 'impressions', fn ($v) => ReportFormat::number($v)),
                 $row('Clicks', 'clicks', fn ($v) => ReportFormat::number($v)),
-                self::neutral($row('Cost', 'cost', fn ($v) => ReportFormat::money($v, $currency))),
                 $row('CTR', 'ctr', fn ($v) => ReportFormat::rate($v, 2), true),
+                $row('Cost', 'cost', fn ($v) => ReportFormat::money($v, $currency)),
                 $row('Cost per click', 'costPerClick', fn ($v) => ReportFormat::money($v, $currency)),
+                $row('Purchases', 'purchases', fn ($v) => ReportFormat::number($v)),
+                $row('Revenue', 'revenue', fn ($v) => ReportFormat::money($v, $currency)),
             ])),
         ];
-    }
-
-    /** A change that is neither good nor bad (more ad spend, for example) is shown in gray. */
-    private static function neutral(?array $row): ?array
-    {
-        if ($row !== null) {
-            $row['change']['color'] = ReportFormat::GRAY;
-        }
-
-        return $row;
     }
 
     /** @return array<string, mixed>|null */
@@ -282,22 +321,30 @@ final class ReportViewData
             return null;
         }
 
-        $list = fn (array $items, string $key) => implode(', ', array_map(
-            fn (array $i) => $i[$key].' ('.ReportFormat::number($i['sessions']).')',
-            $items,
+        $landing = implode(', ', array_map(
+            fn (array $i) => $i['landingPage'].' ('.ReportFormat::number($i['sessions']).')',
+            (array) ($ai['topLandingPages'] ?? []),
         ));
+        $dropped = array_values((array) ($ai['droppedCountries'] ?? []));
 
         return [
             'unavailable' => false,
             'total' => ReportFormat::number($ai['total']['current']),
-            'totalChange' => ReportFormat::change($ai['total']['change'] ?? null),
+            'totalChange' => ReportFormat::change($ai['total']['change'] ?? null, 'sessions'),
             'rows' => array_map(fn (array $r) => [
                 'source' => (string) $r['source'],
                 'sessions' => ReportFormat::number($r['sessions']['current']),
-                'change' => ReportFormat::change($r['sessions']['change'] ?? null),
+                'share' => isset($r['share']['current']) ? ReportFormat::percent($r['share']['current']) : '–',
+                'change' => ReportFormat::change($r['sessions']['change'] ?? null, 'sessions'),
             ], $ai['sources'] ?? []),
-            'countries' => $list($ai['topCountries'] ?? [], 'country'),
-            'pages' => $list($ai['topLandingPages'] ?? [], 'landingPage'),
+            'countryRows' => array_map(fn (array $r) => [
+                'name' => (string) $r['country'],
+                'sessions' => ReportFormat::number($r['sessions']),
+                'share' => isset($r['share']) ? ReportFormat::percent($r['share']) : '–',
+                'change' => ReportFormat::change($r['change'] ?? null, 'sessions'),
+            ], (array) ($ai['topCountries'] ?? [])),
+            'dropped' => $dropped === [] ? null : 'Dropped from the AI top countries: '.implode(', ', $dropped).'.',
+            'pages' => $landing,
         ];
     }
 
@@ -313,7 +360,7 @@ final class ReportViewData
         }
 
         $t = $sc['totals'];
-        $tile = fn (string $label, string $key, string $value, array $change) => ['label' => $label, 'value' => $value, 'change' => $change];
+        $tile = fn (string $label, string $value, array $change, ?string $hint = null) => ['label' => $label, 'value' => $value, 'change' => $change, 'hint' => $hint];
 
         $list = fn (array $rows, string $dimension, bool $isPage) => array_map(fn (array $r) => [
             'name' => $isPage ? (preg_replace('#^https?://[^/]+#', '', (string) $r[$dimension]) ?: '/') : (string) $r[$dimension],
@@ -323,16 +370,26 @@ final class ReportViewData
             'change' => ReportFormat::change($r['clicks']['change'] ?? null),
         ], array_slice($rows, 0, 5));
 
+        $brand = $sc['brand'] ?? null;
+        $brandLine = null;
+        if (is_array($brand) && ($brand['share']['current'] ?? null) !== null) {
+            $brandLine = 'Brand searches (terms: '.implode(', ', array_slice((array) $brand['terms'], 0, 3)).') brought '
+                .ReportFormat::percent($brand['share']['current']).' of clicks'
+                .(($brand['share']['previous'] ?? null) !== null ? ' (previous '.ReportFormat::percent($brand['share']['previous']).')' : '').'.';
+        }
+
         return [
             'unavailable' => false,
             'tiles' => [
-                $tile('Clicks', 'clicks', ReportFormat::number($t['clicks']['current']), ReportFormat::change($t['clicks']['change'] ?? null)),
-                $tile('Impressions', 'impressions', ReportFormat::number($t['impressions']['current']), ReportFormat::change($t['impressions']['change'] ?? null)),
-                $tile('CTR', 'ctr', ReportFormat::rate($t['ctr']['current'], 2), ReportFormat::rateChange($t['ctr']['change'] ?? null)),
-                $tile('Avg. position', 'position', ReportFormat::number($t['position']['current'], 1), ReportFormat::change($t['position']['change'] ?? null)),
+                $tile('Clicks', ReportFormat::number($t['clicks']['current']), ReportFormat::change($t['clicks']['change'] ?? null)),
+                $tile('Impressions', ReportFormat::number($t['impressions']['current']), ReportFormat::change($t['impressions']['change'] ?? null)),
+                $tile('CTR', ReportFormat::rate($t['ctr']['current'], 2), ReportFormat::rateChange($t['ctr']['change'] ?? null)),
+                // A lower position number is better, so a drop in the number is green and a rise is red (already inverted in the payload).
+                $tile('Avg. position', ReportFormat::number($t['position']['current'], 1), ReportFormat::change($t['position']['change'] ?? null), 'lower is better'),
             ],
             'queries' => $list($sc['topQueries'] ?? [], 'query', false),
             'pages' => $list($sc['topPages'] ?? [], 'page', true),
+            'brandLine' => $brandLine,
             'truncated' => (bool) ($sc['truncated'] ?? false),
             'through' => ($sc['through'] ?? null) ? (new DateTimeImmutable($sc['through']))->format('j M Y') : null,
         ];

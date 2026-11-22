@@ -58,13 +58,17 @@ site                    all values are metrics
 
 channels
   total.sessions        metric
+  otherChannels[]       {channel, sessions, share}: the channels folded into "Other" (current period), so text can say what the rest came from
   rows[]                top 6 by current sessions, then an "Other" row
     channel, isOther, sessions (metric), totalUsers (metric)
+    share, shareChange   share of all sessions per range (percent) and its move in percentage points
     averageSessionDuration   metric, seconds ('Other' is the sessions-weighted average of the rest)
     engagementRate           metric, fraction ('Other' is the sessions-weighted average of the rest)
 
 countries                 ranked by ENGAGED sessions (GA4 engagedSessions), highest first
   total.sessions        metric (sum of all country rows, per range)
+  entered, dropped      countries in the current top list but not the previous one, and the reverse ("(not set)" ignored; empty without a previous period)
+  priorityMarkets       null, or {countries, engagedShare, sessionsShare}: combined share of config insight.priority_countries over ALL countries
   largestBySessions     {country, sessions}: the largest country by sessions over ALL countries, "(not set)" excluded (null if none)
   engagedLeader         {country, engagedSessions}: the country with the most engaged sessions over all countries (null if none)
   sessionsSum           sum of the country rows, current period
@@ -97,9 +101,10 @@ country_performance[]   current period, top 10 by ENGAGED sessions
 
 ai_traffic
   total                 metric: sessions from all matching sources
-  sources[]             {source, sessions (metric)}, by current sessions. Sources with 0 sessions in both the current and the
+  sources[]             {source, sessions (metric), share {current, previous}}, by current sessions. Sources with 0 sessions in both the current and the
                         previous period are left out, even if they had year-ago sessions (total still counts everything)
-  topCountries[]        {country, sessions}                top 3, current period, all AI sources together
+  topCountries[]        {country, sessions, previousSessions, change, share, isNew}   top 3 by AI sessions, compared with the previous period
+  droppedCountries[]    countries in the previous top 3 that are not in the current one
   topLandingPages[]     {landingPage, sessions}            top 3, same
 
 paid                    null when ads_source is "none"
@@ -107,7 +112,9 @@ paid                    null when ads_source is "none"
   currency              GA4's currencyCode for the cost figures (null for google_ads_api)
   available             false for google_ads_api
   note                  "Google Ads API reporting is not implemented yet." for google_ads_api, else null
-  metrics               null for google_ads_api, else metrics: impressions, clicks, cost, ctr, costPerClick
+  metrics               null for google_ads_api, else metrics: impressions, clicks, cost, ctr, costPerClick and, when GA4 could provide them,
+                        purchases and revenue from the paid channels (config paid_channels; left out, never zero, if unavailable)
+  campaigns[]           {campaign, impressions, clicks, cost}: top 5 by cost, current period
                         (ctr and costPerClick are null for a range with zero impressions or clicks)
 
 trend
@@ -125,6 +132,8 @@ search_console
   topQueries[]          top 5 (monthly: 10): {query, clicks, impressions, ctr, position (metrics, no yearAgo)}
   topPages[]            same with `page`
   daily[]               {date, clicks, impressions} for every day of the current window, zeros for days without rows
+  brand                 null, or {terms, clicks, share, sampleTruncated} when config insight.brand_terms is set: share = percent of clicks from
+                        queries containing a brand term, {current, previous}
 
 quality_alerts[]         informational list, empty when all is well. Never fails a build. Each item: {code, message, details}
   country_sum_mismatch   countries.warning is true. details: sessionsSum, sessionsTotal, excessPercent, tolerancePercent

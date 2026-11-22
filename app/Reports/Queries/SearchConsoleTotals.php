@@ -10,6 +10,7 @@ use App\Exceptions\PropertyNotConfiguredException;
 use App\Models\Property;
 use App\Reports\Ga4Rows;
 use App\Support\Compare;
+use App\Support\InsightConfig;
 use App\Support\ReportPeriod;
 use App\Support\SearchConsoleQuery;
 use DateTimeImmutable;
@@ -31,12 +32,17 @@ use DateTimeInterface;
  *   'topQueries' => [['query', 'clicks', 'impressions', 'ctr', 'position'] each a metric (current, previous)],
  *   'topPages'   => same with 'page',
  *   'daily' => [['date', 'clicks', 'impressions'], ...] for every day of the window
+ *   'brand' => null, or when config report.insight.brand_terms is set (per property override allowed):
+ *     ['terms', 'clicks' => ['current', 'previous'], 'share' => ['current', 'previous'] (percent of all clicks from queries
+ *     containing a brand term), 'sampleTruncated']. It reads the top 1000 queries of each window.
  * ]
  * A top row whose previous value is missing may simply be outside the previous top 1000 rows.
  */
 final class SearchConsoleTotals
 {
     private const PREVIOUS_ROW_LIMIT = 1000;
+
+    private const BRAND_ROW_LIMIT = 1000;
 
     public function __construct(private readonly SearchConsoleClient $gsc)
     {
@@ -73,15 +79,56 @@ final class SearchConsoleTotals
         ];
 
         if (! $window['hasData']) {
-            return $base + ['totals' => null, 'topQueries' => [], 'topPages' => [], 'daily' => []];
+            return $base + ['totals' => null, 'topQueries' => [], 'topPages' => [], 'daily' => [], 'brand' => null];
         }
 
+        $totals = $this->totals($property, $windows);
+
         return $base + [
-            'totals' => $this->totals($property, $windows),
+            'totals' => $totals,
+            'brand' => $this->brand($property, $windows, $totals),
             'topQueries' => $this->top($property, $period, $windows, 'query', 'queries', 'search_queries'),
             'topPages' => $this->top($property, $period, $windows, 'page', 'pages', 'search_pages'),
             'daily' => $this->daily($property, $windows['current']),
         ];
+    }
+
+    /**
+     * Share of clicks that come from queries containing a brand term. Null when no brand terms are configured.
+     *
+     * @param  array<string, mixed>  $totals
+     */
+    private function brand(Property $property, array $windows, array $totals): ?array
+    {
+        $terms = InsightConfig::list('brand_terms', $property->slug);
+        if ($terms === []) {
+            return null;
+        }
+
+        $clicks = [];
+        $share = [];
+        $truncated = false;
+        foreach (['current', 'previous'] as $range) {
+            $rows = $this->gsc->query($property, new SearchConsoleQuery("brand.{$range}", $windows[$range][0], $windows[$range][1], ['query'], self::BRAND_ROW_LIMIT));
+            $truncated = $truncated || count($rows) >= self::BRAND_ROW_LIMIT;
+
+            $brandClicks = 0.0;
+            foreach ($rows as $row) {
+                foreach ($terms as $term) {
+                    if (mb_stripos($row['keys'][0], $term) !== false) {
+                        $brandClicks += $row['clicks'];
+
+                        break;
+                    }
+                }
+            }
+
+            $all = (float) ($totals['clicks'][$range] ?? 0);
+            $clicks[$range] = $brandClicks;
+            $share[$range] = $all > 0 ? round($brandClicks / $all * 100, 1) : null;
+        }
+
+        return ['terms' => $terms, 'clicks' => $clicks, 'share' => $share, 'sampleTruncated' => $truncated];
     }
 
     private function totals(Property $property, array $windows): array

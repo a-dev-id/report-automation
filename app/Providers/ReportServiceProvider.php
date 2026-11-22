@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Contracts\Ga4Client;
+use App\Contracts\InsightGenerator;
 use App\Contracts\ReportBuilder;
 use App\Contracts\SearchConsoleClient;
 use App\Services\Ga4GscReportBuilder;
+use App\Services\Reports\Insight\RuleBasedInsightGenerator;
 use App\Services\Google\Ga4ApiClient;
 use App\Services\Google\Retrier;
 use App\Services\Google\SearchConsoleApiClient;
@@ -23,6 +25,9 @@ class ReportServiceProvider extends ServiceProvider
         // The clients are created lazily: nothing reads the credentials file until a report runs.
         $this->app->singleton(Ga4Client::class, fn () => new Ga4ApiClient($this->credentialsPath(), $this->retrier()));
         $this->app->singleton(SearchConsoleClient::class, fn () => new SearchConsoleApiClient($this->credentialsPath(), $this->retrier()));
+
+        // The insight text is written by rules. To use an AI-written insight later, bind another App\Contracts\InsightGenerator here.
+        $this->app->bind(InsightGenerator::class, RuleBasedInsightGenerator::class);
 
         // PlaceholderReportBuilder is kept in app/Services but no longer bound.
         $this->app->bind(ReportBuilder::class, Ga4GscReportBuilder::class);

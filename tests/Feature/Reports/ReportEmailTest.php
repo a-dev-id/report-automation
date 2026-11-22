@@ -85,7 +85,7 @@ class ReportEmailTest extends TestCase
         $this->assertStringContainsString('<title>Nandini Weekly Traffic Report: 9 to 15 Nov 2026</title>', $html);
 
         $order = ['Traffic Quality Insight', '>Sessions</td>', 'Sessions, last 8 weeks', 'Traffic by channel', 'Top countries by engaged sessions', 'Country performance',
-            'Paid advertising', 'Traffic from AI assistants', 'Search Console', 'Data notes'];
+            'Paid advertising', 'Traffic from AI assistants', 'padding:0 0 12px 0;">Search Console</td>', 'Data notes'];
         $last = -1;
         foreach ($order as $marker) {
             $pos = strpos($html, $marker);
@@ -105,7 +105,7 @@ class ReportEmailTest extends TestCase
         $this->assertStringContainsString('62.0%', $html);                 // engagement rate, one decimal
         $this->assertStringContainsString('IDR 48,000,000', $html);        // IDR without decimals
         $this->assertStringContainsString('2.50%', $html);                 // Search Console CTR
-        $this->assertStringContainsString('color:#1E8E3E', $html);         // green for an improvement
+        $this->assertStringContainsString('color:#15803D', $html);         // green (#15803D) for a positive change
         $this->assertStringContainsString('▲ +25.0%', $html);
         $this->assertStringContainsString('+2.0 pts', $html);              // engagement rate change in points
         $this->assertStringContainsString('vs last week', $html);
@@ -124,9 +124,13 @@ class ReportEmailTest extends TestCase
         $this->assertSame(1, preg_match('/>Cost<\/td>.*?font-weight:bold; (color:#[0-9A-F]{6})/', $flat, $m));
         $this->assertSame('color:#6B7280', $m[1]);
 
-        // Cost per click keeps its colour: lower is better there.
+        // Cost per click is on the neutral list too (config report.styling.neutral_metrics): gray whatever its direction.
         $this->assertSame(1, preg_match('/>Cost per click<\/td>.*?font-weight:bold; (color:#[0-9A-F]{6})/', $flat, $m));
-        $this->assertContains($m[1], ['color:#1E8E3E', 'color:#C5221F']);
+        $this->assertSame('color:#6B7280', $m[1]);
+
+        // Every other paid metric keeps its green or red.
+        $this->assertSame(1, preg_match('/>Clicks<\/td>.*?font-weight:bold; (color:#[0-9A-F]{6})/', $flat, $m));
+        $this->assertContains($m[1], ['color:#15803D', 'color:#B91C1C']);
 
         // The fixture has campaigns "(not set)" and "brand-aus": only a real campaign name is shown.
         $this->assertStringNotContainsString('(not set)', $html);
@@ -140,7 +144,7 @@ class ReportEmailTest extends TestCase
         [, $html] = $this->render($report);
 
         // Position fell from 13.1 to 12.3: lower is better, so a down arrow in green.
-        $this->assertMatchesRegularExpression('/color:#1E8E3E[^>]*>▼ -6\.1%/', $html);
+        $this->assertMatchesRegularExpression('/color:#15803D[^>]*>▼ -6\.1%/', $html);
     }
 
     public function test_monthly_report_also_shows_year_ago(): void

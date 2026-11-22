@@ -1,6 +1,6 @@
 {{--
-    Plain-text version of the report. Same data as report.blade.php ($view comes from ReportViewData).
-    {!! !!} is used on purpose: this is not HTML, so nothing is escaped.
+    Plain-text version of the report. Same data as report.blade.php ($view comes from ReportViewData): no colors, every change keeps
+    its arrow and explicit + or - sign. {!! !!} is used on purpose: this is not HTML, so nothing is escaped.
 --}}
 @php
     $arrow = fn (array $c) => trim(($c['arrow'] !== '' ? $c['arrow'].' ' : '').$c['text']);
@@ -9,16 +9,22 @@
 {!! strtoupper($view['propertyName']) !!}
 {!! $view['title'] !!}: {!! $view['periodLabel'] !!}
 {!! $line !!}
-@if (! empty($view['insight']['headline']))
+@if (! empty($view['insight']['headline']['text']))
 
 TRAFFIC QUALITY INSIGHT
-{!! $view['insight']['headline'] !!}
-@foreach ($view['insight']['bullets'] as $bullet)
- * {!! $bullet !!}
+{!! $view['insight']['headline']['text'] !!}
+@foreach ($view['insight']['paragraphs'] as $paragraph)
+
+{!! strtoupper($paragraph['title']) !!}
+{!! $paragraph['text'] !!}
 @endforeach
+@if (! empty($view['insight']['priority']))
+
+{!! $view['insight']['priority']['text'] !!}
+@endif
 @if (! empty($view['insight']['caution']))
 
-{!! $view['insight']['caution'] !!}
+{!! $view['insight']['caution']['text'] !!}
 @endif
 @endif
 @if (! empty($view['kpis']))
@@ -46,8 +52,11 @@ TRAFFIC BY CHANNEL
 This section is temporarily unavailable.
 @else
 @foreach ($view['channels']['rows'] as $row)
- * {!! $row['name'] !!}: {!! $row['sessions'] !!} sessions ({!! $arrow($row['change']) !!}), engagement {!! $row['engagement'] !!}
+ * {!! $row['name'] !!}: {!! $row['share'] !!} of sessions, {!! $row['sessions'] !!} sessions ({!! $arrow($row['change']) !!}), engagement {!! $row['engagement'] !!}
 @endforeach
+@if ($view['channels']['remaining'])
+{!! $view['channels']['remaining'] !!}
+@endif
 @endif
 @endif
 @if ($view['countries'])
@@ -57,8 +66,11 @@ This section is temporarily unavailable.
 This section is temporarily unavailable.
 @else
 @foreach ($view['countries']['rows'] as $row)
- * {!! $row['name'] !!}: {!! $row['engaged'] !!} engaged sessions, {!! $row['sessions'] !!} sessions ({!! $row['share'] !!} of traffic, {!! $arrow($row['change']) !!})
+ * {!! $row['name'] !!}: {!! $row['engaged'] !!} engaged sessions ({!! $row['share'] !!} of engaged, {!! $arrow($row['change']) !!}), {!! $row['sessions'] !!} sessions
 @endforeach
+@if ($view['countries']['dropped'])
+{!! $view['countries']['dropped'] !!}
+@endif
 @endif
 @endif
 @if ($view['countryPerformance'])
@@ -68,7 +80,7 @@ COUNTRY PERFORMANCE
 This section is temporarily unavailable.
 @else
 @foreach ($view['countryPerformance']['rows'] as $row)
- * {!! $row['country'] !!}@if ($row['detail'] !== '') ({!! $row['detail'] !!})@endif: {!! $row['sessions'] !!} sessions, {!! $row['engaged'] !!} engaged, engagement {!! $row['engagement'] !!}, booking visits {!! $row['bookingVisits'] !!}, {!! $row['quality'] !!}@if ($row['flag']) [{!! $row['flag'] !!}]@endif
+ * {!! $row['country'] !!}@if ($row['detail'] !== '') ({!! $row['detail'] !!})@endif: {!! $row['sessions'] !!} sessions ({!! $row['share'] !!} of all), {!! $row['engaged'] !!} engaged, engagement {!! $row['engagement'] !!}, booking visits {!! $row['bookingVisits'] !!}, {!! $row['quality'] !!}@if ($row['flag']) [{!! $row['flag'] !!}]@endif
 
 @endforeach
 @endif
@@ -91,10 +103,16 @@ TRAFFIC FROM AI ASSISTANTS
 This section is temporarily unavailable.
 @else
 @foreach ($view['ai']['rows'] as $row)
- * {!! $row['source'] !!}: {!! $row['sessions'] !!} sessions ({!! $arrow($row['change']) !!})
+ * {!! $row['source'] !!}: {!! $row['share'] !!} of AI sessions, {!! $row['sessions'] !!} sessions ({!! $arrow($row['change']) !!})
 @endforeach
-@if ($view['ai']['countries'] !== '')
-Top countries: {!! $view['ai']['countries'] !!}
+@if (! empty($view['ai']['countryRows']))
+Top countries (AI traffic):
+@foreach ($view['ai']['countryRows'] as $row)
+ * {!! $row['name'] !!}: {!! $row['share'] !!}, {!! $row['sessions'] !!} sessions ({!! $arrow($row['change']) !!})
+@endforeach
+@endif
+@if ($view['ai']['dropped'])
+{!! $view['ai']['dropped'] !!}
 @endif
 @if ($view['ai']['pages'] !== '')
 Top landing pages: {!! $view['ai']['pages'] !!}
@@ -108,8 +126,11 @@ SEARCH CONSOLE
 This section is temporarily unavailable.
 @else
 @foreach ($view['searchConsole']['tiles'] as $tile)
- * {!! $tile['label'] !!}: {!! $tile['value'] !!} ({!! $arrow($tile['change']) !!})
+ * {!! $tile['label'] !!}@if ($tile['hint']) ({!! $tile['hint'] !!})@endif: {!! $tile['value'] !!} ({!! $arrow($tile['change']) !!})
 @endforeach
+@if ($view['searchConsole']['brandLine'])
+{!! $view['searchConsole']['brandLine'] !!}
+@endif
 @if (! empty($view['searchConsole']['queries']))
 
 Top queries (clicks / impressions / position)

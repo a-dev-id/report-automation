@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Contracts\InsightGenerator;
 use App\Models\Property;
 use App\Models\Report;
 use App\Services\Reports\ChartRenderer;
-use App\Services\Reports\InsightGenerator;
 use App\Services\Reports\ReportViewData;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
