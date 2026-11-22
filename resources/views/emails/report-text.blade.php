@@ -66,7 +66,7 @@ This section is temporarily unavailable.
 This section is temporarily unavailable.
 @else
 @foreach ($view['countries']['rows'] as $row)
- * {!! $row['name'] !!}: {!! $row['engaged'] !!} engaged sessions ({!! $row['share'] !!} of engaged, {!! $arrow($row['change']) !!}), {!! $row['sessions'] !!} sessions
+ * {!! $row['name'] !!}: {!! $row['engaged'] !!} engaged sessions ({!! $row['share'] !!} of engaged, engaged change {!! $arrow($row['change']) !!}), {!! $row['sessions'] !!} sessions
 @endforeach
 @if ($view['countries']['dropped'])
 {!! $view['countries']['dropped'] !!}
@@ -80,7 +80,7 @@ COUNTRY PERFORMANCE
 This section is temporarily unavailable.
 @else
 @foreach ($view['countryPerformance']['rows'] as $row)
- * {!! $row['country'] !!}@if ($row['detail'] !== '') ({!! $row['detail'] !!})@endif: {!! $row['sessions'] !!} sessions ({!! $row['share'] !!} of all), {!! $row['engaged'] !!} engaged, engagement {!! $row['engagement'] !!}, booking visits {!! $row['bookingVisits'] !!}, {!! $row['quality'] !!}@if ($row['flag']) [{!! $row['flag'] !!}]@endif
+ * {!! $row['country'] !!}@if ($row['detail'] !== '') ({!! $row['detail'] !!})@endif: {!! $row['sessions'] !!} sessions ({!! $row['share'] !!} of sessions), {!! $row['engaged'] !!} engaged, engagement {!! $row['engagement'] !!}, booking visits {!! $row['bookingVisits'] !!}, {!! $row['quality'] !!}@if ($row['flag']) [{!! $row['flag'] !!}]@endif
 
 @endforeach
 @endif

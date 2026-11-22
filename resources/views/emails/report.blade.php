@@ -201,7 +201,7 @@
                     </table>
                 @endif
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                    <tr><th align="left" style="{{ $th }}">Country</th><th align="right" style="{{ $thNum }}">Engaged</th><th align="right" style="{{ $thNum }}">Share</th><th align="right" style="{{ $thNum }}">Change</th><th align="right" style="{{ $thNum }}">Sessions</th></tr>
+                    <tr><th align="left" style="{{ $th }}">Country</th><th align="right" style="{{ $thNum }}">Engaged</th><th align="right" style="{{ $thNum }}">Share of engaged</th><th align="right" style="{{ $thNum }}">Engaged change</th><th align="right" style="{{ $thNum }}">Sessions</th></tr>
                     @foreach ($view['countries']['rows'] as $row)
                         <tr>
                             <td style="{{ $td }}">{{ $row['name'] }}</td>
@@ -226,27 +226,34 @@
             @if ($view['countryPerformance']['unavailable'])
                 @include('emails.partials.unavailable')
             @else
+                {{-- Fixed percentage widths so the seven columns fit 640px: country 20, sessions 12, share 12, engaged 11, rate 12, bookings 13, quality 20 --}}
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
-                        <th align="left" style="{{ $th }}">Country</th><th align="right" style="{{ $thNum }}">Sessions</th><th align="right" style="{{ $thNum }}">Share</th><th align="right" style="{{ $thNum }}">Engaged</th>
-                        <th align="right" style="{{ $thNum }}">Engagement</th><th align="right" style="{{ $thNum }}">Booking visits</th><th align="left" style="{{ $th }}">Quality</th>
+                        <th align="left" width="20%" style="{{ $th }}">Country</th>
+                        <th align="right" width="12%" style="{{ $thNum }}">Sessions</th>
+                        <th align="right" width="12%" style="{{ $thNum }}">Share of sessions</th>
+                        <th align="right" width="11%" style="{{ $thNum }}">Engaged</th>
+                        <th align="right" width="12%" style="{{ $thNum }}">Engaged rate</th>
+                        <th align="right" width="13%" style="{{ $thNum }}">Booking visits</th>
+                        <th align="left" width="20%" style="{{ $th }}">Quality</th>
                     </tr>
                     @foreach ($view['countryPerformance']['rows'] as $row)
                         <tr>
-                            <td style="{{ $td }}">{{ $row['country'] }}
-                                @if ($row['detail'] !== '')<br><span style="{{ $font }} font-size:13px; color:#6B7280;">{{ $row['detail'] }}</span>@endif
+                            <td width="20%" style="{{ $td }} word-break:break-word;">{{ $row['country'] }}
+                                @if ($row['detail'] !== '')<br><span style="{{ $font }} font-size:12px; line-height:16px; color:#6B7280;">{{ $row['detail'] }}</span>@endif
                             </td>
-                            <td align="right" style="{{ $num }}">{{ $row['sessions'] }}</td>
-                            <td align="right" style="{{ $num }}">{{ $row['share'] }}</td>
-                            <td align="right" style="{{ $num }}">{{ $row['engaged'] }}</td>
-                            <td align="right" style="{{ $num }}">{{ $row['engagement'] }}</td>
-                            <td align="right" style="{{ $num }}">{{ $row['bookingVisits'] }}</td>
-                            <td style="{{ $td }}">{{ $row['quality'] }}
-                                @if ($row['flag'])<br><span style="{{ $font }} font-size:13px; color:#B45309; font-weight:bold;">{{ $row['flag'] }}</span>@endif
+                            <td align="right" width="12%" style="{{ $num }}">{{ $row['sessions'] }}</td>
+                            <td align="right" width="12%" style="{{ $num }}">{{ $row['share'] }}</td>
+                            <td align="right" width="11%" style="{{ $num }}">{{ $row['engaged'] }}</td>
+                            <td align="right" width="12%" style="{{ $num }}">{{ $row['engagement'] }}</td>
+                            <td align="right" width="13%" style="{{ $num }}">{{ $row['bookingVisits'] }}</td>
+                            <td width="20%" style="{{ $td }} white-space:nowrap;">{{ $row['quality'] }}
+                                @if ($row['flag'])<br><span style="{{ $font }} font-size:12px; line-height:16px; color:#B45309; font-weight:bold;">{{ $row['flag'] }}</span>@endif
                             </td>
                         </tr>
                     @endforeach
                 </table>
+                {!! $para('Each row shows the country\'s strongest traffic source, so session totals can differ from the table above.', 'font-size:12px; line-height:17px; color:#6B7280;', '8px 0 0 0') !!}
             @endif
         @endif
     </td></tr>

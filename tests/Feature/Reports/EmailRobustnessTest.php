@@ -85,7 +85,7 @@ class EmailRobustnessTest extends TestCase
         $preheader = html_entity_decode(trim(preg_replace('/(&nbsp;|&zwnj;)+/', '', $m[2])), ENT_QUOTES | ENT_HTML5);
         $this->assertNotSame('', $preheader);
         $this->assertLessThanOrEqual(90, mb_strlen($preheader));
-        $this->assertStringStartsWith('This week is best described as healthy growth: sessions rose ▲ +25.0% to 10,000', $preheader);
+        $this->assertStringStartsWith('Traffic grew healthily this week: sessions rose +25.0% to 10,000', $preheader);
     }
 
     public function test_the_preheader_is_at_most_90_characters_and_cut_at_a_word(): void
@@ -243,8 +243,8 @@ class EmailRobustnessTest extends TestCase
 
         $this->assertStringContainsString('Top countries by engaged sessions', $html);
         $this->assertStringContainsString('Engaged</th>', $html);
-        $this->assertSame(1, preg_match('#Country performance.*?<th[^>]*>Country</th>.*?Sessions</th>.*?Engaged</th>.*?Engagement</th>.*?Booking visits</th>.*?Quality</th>#s', $html));
-        $this->assertStringContainsString('check for bots', $html);                      // the flag stays
+        $this->assertSame(1, preg_match('#Country performance.*?<th[^>]*>Country</th>.*?Sessions</th>.*?Engaged</th>.*?Engaged rate</th>.*?Booking visits</th>.*?Quality</th>#s', $html));
+        $this->assertStringContainsString('possible bots', $html);                      // the flag stays
         // Fallback table (no chart) is ranked by engaged sessions: Indonesia (1,500), Australia (1,440), United States (840).
         $this->assertSame(1, preg_match('#Top countries by engaged sessions</td>(.*?)Country performance#s', $html, $card));
         $this->assertSame(1, preg_match('#Indonesia.*?1,500.*?Australia.*?1,440.*?United States.*?840.*?United Kingdom.*?270#s', $card[1]));

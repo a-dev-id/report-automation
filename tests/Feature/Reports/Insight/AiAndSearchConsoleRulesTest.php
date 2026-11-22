@@ -45,7 +45,7 @@ class AiAndSearchConsoleRulesTest extends TestCase
         $findings = $this->aiFindings($this->ai());
 
         $this->assertSame(
-            'AI assistants referred 175 sessions (▲ +65.1%), led by chatgpt.com with 68.6% of them. New this period: gemini.google.com.',
+            'AI assistants referred 175 sessions (+65.1%), led by chatgpt.com with 68.6% of them. New this period: gemini.google.com.',
             $this->plain($this->find($findings, 'overview')),
         );
         $meaning = $this->find($findings, 'meaning');
@@ -62,10 +62,10 @@ class AiAndSearchConsoleRulesTest extends TestCase
         $text = $this->plain($this->find($this->aiFindings($this->ai()), 'countries'));
 
         $this->assertSame(
-            'Most AI visitors came from United States (40.0%, ▲ +16.7%), Indonesia (28.6%, ▲ New) and Australia (17.1%, ▲ +50.0%). Dropped out of the AI top list: Germany.',
+            'Most AI visitors came from United States (40.0% of AI sessions, +16.7%), Indonesia (28.6%, New) and Australia (17.1%, +50.0%). Dropped out of the AI top list: Germany.',
             $text,
         );
-        $this->assertStringContainsString('⟦new|▲ New⟧', $this->find($this->aiFindings($this->ai()), 'countries')->text);
+        $this->assertStringContainsString('⟦new|New⟧', $this->find($this->aiFindings($this->ai()), 'countries')->text);
     }
 
     public function test_the_ai_paragraph_needs_a_minimum_number_of_sessions(): void
@@ -103,7 +103,7 @@ class AiAndSearchConsoleRulesTest extends TestCase
     {
         $text = $this->plain($this->find($this->aiFindings($this->ai(40, 0)), 'overview'));
 
-        $this->assertStringContainsString('referred 40 sessions (▲ New)', $text);
+        $this->assertStringContainsString('referred 40 sessions (New)', $text);
     }
 
     // ---- Search Console -----------------------------------------------------------------------------
@@ -158,18 +158,18 @@ class AiAndSearchConsoleRulesTest extends TestCase
         $slipped = $this->find($this->scFindings($this->sc()), 'overview');
         $this->assertStringContainsString('The average position slipped from 10.0 to 10.8', $this->plain($slipped));
         $this->assertStringContainsString('a lower number is better', $this->plain($slipped));
-        $this->assertStringContainsString('⟦neg|▲ +8.0%⟧', $slipped->text);   // the number went up, which is worse: red
+        $this->assertStringContainsString('⟦neg|+8.0%⟧', $slipped->text);   // the number went up, which is worse: red
 
         $improved = $this->find($this->scFindings($this->sc(['position' => $this->m(9.0, 10.0, lowerIsBetter: true)])), 'overview');
         $this->assertStringContainsString('The average position improved from 10.0 to 9.0', $this->plain($improved));
-        $this->assertStringContainsString('⟦pos|▼ -10.0%⟧', $improved->text);    // the number went down, which is better: green
+        $this->assertStringContainsString('⟦pos|-10.0%⟧', $improved->text);    // the number went down, which is better: green
     }
 
     public function test_the_search_overview_reads_as_a_sentence(): void
     {
         $text = $this->plain($this->find($this->scFindings($this->sc()), 'overview'));
 
-        $this->assertStringStartsWith('In Google Search, impressions rose ▲ +20.0% to 12,000, clicks fell ▼ -10.0% to 90 and the click-through rate fell', $text);
+        $this->assertStringStartsWith('In Google Search, impressions rose +20.0% to 12,000, clicks fell -10.0% to 90 and the click-through rate fell', $text);
     }
 
     public function test_the_brand_share_is_skipped_without_brand_terms(): void

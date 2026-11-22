@@ -27,7 +27,7 @@ class VerdictTest extends TestCase
 
         $this->assertSame('healthy growth', $v['key']);
         $this->assertSame(
-            'This week is best described as healthy growth: sessions rose ▲ +25.0% to 1,250, engagement rose ▲ +2.0 pts to 62.0% and booking-engine visits rose ▲ +50.0% to 60.',
+            'Traffic grew healthily this week: sessions rose +25.0% to 1,250, engagement rose +2.0 pts to 62.0% and booking-engine visits rose +50.0% to 60.',
             $v['text'],
         );
     }
@@ -37,8 +37,8 @@ class VerdictTest extends TestCase
         $v = $this->verdict(['sessions' => $this->m(1250, 1000), 'engagementRate' => $this->m(0.45, 0.60), 'bookingEngineVisits' => $this->m(45, 40)]);
 
         $this->assertSame('growth with weaker quality', $v['key']);
-        $this->assertStringStartsWith('This week is best described as growth with weaker quality: sessions rose', $v['text']);
-        $this->assertStringContainsString('engagement fell ▼ -15.0 pts to 45.0%', $v['text']);
+        $this->assertStringStartsWith('Traffic grew, but quality weakened this week: sessions rose', $v['text']);
+        $this->assertStringContainsString('engagement fell -15.0 pts to 45.0%', $v['text']);
     }
 
     public function test_sessions_up_but_fewer_booking_visits_is_also_weaker_quality(): void
@@ -51,7 +51,7 @@ class VerdictTest extends TestCase
         $v = $this->verdict(['sessions' => $this->m(700, 1000), 'engagementRate' => $this->m(0.58, 0.60), 'bookingEngineVisits' => $this->m(38, 40)]);
 
         $this->assertSame('decline', $v['key']);
-        $this->assertStringStartsWith('This week is best described as a decline: sessions fell ▼ -30.0% to 700', $v['text']);
+        $this->assertStringStartsWith('Traffic declined this week: sessions fell -30.0% to 700', $v['text']);
     }
 
     public function test_sessions_down_but_better_engagement_or_booking_is_mixed(): void
@@ -65,7 +65,7 @@ class VerdictTest extends TestCase
         $v = $this->verdict(['sessions' => $this->m(1030, 1000), 'engagementRate' => $this->m(0.605, 0.60), 'bookingEngineVisits' => $this->m(41, 40)]);
 
         $this->assertSame('stable', $v['key']);
-        $this->assertStringStartsWith('This week is best described as stable:', $v['text']);
+        $this->assertStringStartsWith('Traffic was stable this week:', $v['text']);
 
         // Exactly +5.0% is still inside the band; just beyond it is growth.
         $this->assertSame('stable', $this->verdict(['sessions' => $this->m(1050, 1000), 'engagementRate' => $this->m(0.60, 0.60), 'bookingEngineVisits' => $this->m(40, 40)])['key']);
@@ -104,7 +104,7 @@ class VerdictTest extends TestCase
         $v = $this->verdict(['sessions' => $this->m(1250, 1000), 'engagementRate' => null, 'bookingEngineVisits' => null]);
 
         $this->assertSame('healthy growth', $v['key']);
-        $this->assertSame('This week is best described as healthy growth: sessions rose ▲ +25.0% to 1,250.', $v['text']);
+        $this->assertSame('Traffic grew healthily this week: sessions rose +25.0% to 1,250.', $v['text']);
     }
 
     public function test_sessions_that_are_new_count_as_growth_and_a_zero_previous_never_divides(): void
@@ -140,7 +140,7 @@ class VerdictTest extends TestCase
     {
         $v = $this->verdict(['sessions' => $this->m(1250, 1000)], 'monthly');
 
-        $this->assertStringStartsWith('This month is best described as healthy growth:', $v['text']);
+        $this->assertStringStartsWith('Traffic grew healthily this month:', $v['text']);
     }
 
     public function test_a_missing_site_section_gives_a_neutral_headline(): void

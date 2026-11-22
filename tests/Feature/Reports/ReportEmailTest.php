@@ -304,8 +304,8 @@ class ReportEmailTest extends TestCase
             $this->assertStringContainsString($needle, $text, "text: {$needle}");
         }
 
-        $this->assertStringContainsString('check for bots', $html);
-        $this->assertStringContainsString('check for bots', $text);
+        $this->assertStringContainsString('possible bots', $html);
+        $this->assertStringContainsString('possible bots', $text);
         $this->assertStringContainsString('Generated', $html);
         $this->assertStringContainsString('Asia/Makassar', $text);
         $this->assertSame($text, strip_tags($text));   // no HTML tags in the text version

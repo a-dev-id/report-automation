@@ -31,7 +31,9 @@ changing that one binding: it only has to return the same shape (`verdict`, `hea
 
 About 350 words for a weekly report and 400 for a monthly one (`insight.max_words`). When the text is too long the least important
 optional sentences are dropped first; the first sentence of each paragraph and the AI "meaning" line are never dropped.
-"This week" or "This month" wording follows the report type; monthly also compares with the same month last year.
+"this week" or "this month" wording follows the report type; monthly also compares with the same month last year.
+
+**Wording rules.** The headline reads naturally ("Traffic declined this week: sessions fell -9.8% to 6,545, ..."; the verdict logic is unchanged). Signed values stay bold and colored but carry no ▲▼ arrows inside sentences (arrows remain in the KPI tiles and tables). A figure is never stated twice in one paragraph (for example a dominant channel's share is given once, then its engagement and duration). "Engaged sessions" is explained once, as visits where people actually interacted with the site.
 
 **Rules** (one small class per section in `app/Services/Reports/Insight/`, each rule returns a sentence and an optional action; all
 thresholds are in `config/report.php` under `insight`)
@@ -39,9 +41,9 @@ thresholds are in `config/report.php` under `insight`)
 | Section | Rules |
 |---|---|
 | Advertising | impressions up + clicks down + CTR down = reached more people but fewer responded (review placements and creative); clicks up but CTR down; impressions and clicks both down = reach shrank; cost up with no purchases = spend without bookings, judge by booking-engine visits; clicks up + cost per click down = more efficient; cost per click up = less efficient; display or awareness campaigns = awareness, not demand |
-| Website traffic | sessions up while engagement or session duration is down = growth from lower-quality traffic (names the channel that grew most); sessions down while engagement is up = fewer but more interested visitors; sessions up while booking-engine visits are flat or down = check the booking button and landing pages; booking-engine rate up or down and what it means; purchases or revenue under `small_numbers.min_purchases` (5) in both periods = "numbers are small", not a trend; monthly: against the same month last year |
+| Website traffic | sessions up while engagement or session duration is down = growth from lower-quality traffic (names the channel that grew most); sessions down while engagement is up = fewer but more interested visitors; sessions up while booking-engine visits are flat or down = check the booking button and landing pages; booking-engine rate: interpreted ("more/fewer visitors showed interest in booking") only when it moved by at least `booking_rate.min_points` (0.5 pts) or `booking_rate.min_relative_percent` (15%) AND there were at least `booking_rate.min_visits` (20) booking-engine visits in either period; a smaller move is stated as numbers only, and a negligible one is left out; purchases or revenue under `small_numbers.min_purchases` (5) in both periods = "numbers are small", not a trend; monthly: against the same month last year |
 | Where visitors came from | the largest sources with their share and "the remaining X% came from ..."; one channel above `dominant_channel.min_share_percent` (40%) with engagement under 25% or an average visit under the bot threshold = likely automated or low-quality traffic (check bot and referral filtering in GA4); a share that moved by more than `share_move_points` (10) |
-| Countries | ranked by engaged sessions; new countries in the top list judged genuine (engagement and booking activity), suspicious (very low engagement, no booking activity) or "needs a closer look"; countries that dropped out; `priority_countries` combined share (when set); rows flagged for bots; the best traffic quality country |
+| Countries | ranked by engaged sessions; new countries in the top list in three tiers (`new_country`): "shows genuine booking interest" (at least 50% engaged and 3 booking-engine visits), "shows some booking interest" (at least 30% engaged and 1 visit), otherwise "needs a closer look"; "genuine" is never used below 3 visits, and without booking data only engagement is described; countries that dropped out; `priority_countries` combined share (when set); rows flagged for bots; the best traffic quality country |
 | AI assistants | only above `ai.min_sessions` (20): top assistant and share, new assistants, top countries with share and "New", dropped countries, and what it means |
 | Search Console | impressions up + clicks down = shown more but clicked less (with the position change); both up or both down = visibility improved or weakened; `brand_terms` share of clicks (skipped when empty); the data-through date when truncated |
 
@@ -89,7 +91,7 @@ and keeps the signs.
 Insight, KPI tiles (sessions, users, engagement rate, average session duration, key events, purchases and revenue when present; monthly adds
 vs year ago),
 trend, channels (chart and table), "Top countries by engaged sessions" (chart) and the Country performance table (Sessions,
-Engaged, Engagement, Booking visits, Quality and the "check for bots" flag; ranked by engaged sessions), Paid (only with data), AI traffic (only with
+Engaged, Engaged rate, Booking visits and Quality, with "possible bots" as a small second line; ranked by engaged sessions). The countries table is headed "Share of engaged" and "Engaged change" (what the change is computed on); Country performance uses "Share of sessions" and notes that each row shows the country's strongest traffic source, so session totals can differ from the table above, Paid (only with data), AI traffic (only with
 data), Search Console (tiles, top 5 queries and pages), Data notes. A section whose payload value is an `{error}` object shows
 "This section is temporarily unavailable." An empty section is left out. Ad **cost** changes are gray, because more spend is
 neither good nor bad.

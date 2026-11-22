@@ -47,7 +47,7 @@ class CountryRulesTest extends TestCase
         $finding = $this->find($this->rules->findings($this->context($payload)), 'overview');
 
         $this->assertSame(
-            'Ranked by engaged sessions, the most engaged visitors came from Spain (23.5%), Indonesia (22.8%) and United States (17.3%).',
+            'Ranked by engaged sessions (visits where people actually interacted with the site), the most engaged visitors came from Spain (23.5% of engaged sessions), Indonesia (22.8%) and United States (17.3%).',
             $this->plain($finding),
         );
         $this->assertTrue($finding->essential);
@@ -63,10 +63,10 @@ class CountryRulesTest extends TestCase
 
         $text = $this->plain($this->find($this->rules->findings($this->context($payload)), 'overview'));
 
-        $this->assertSame('Ranked by engaged sessions, the most engaged visitors came from Spain (20.0%).', $text);
+        $this->assertSame('Ranked by engaged sessions (visits where people actually interacted with the site), the most engaged visitors came from Spain (20.0% of engaged sessions).', $text);
     }
 
-    public function test_a_new_country_with_real_engagement_and_booking_activity_looks_genuine(): void
+    public function test_a_new_country_with_real_engagement_and_booking_activity_shows_genuine_interest(): void
     {
         $payload = $this->payload2(
             [$this->country('Spain', 295, 200, 549, 23.5), $this->country('India', 50, null, 100, 3.0)],
@@ -76,11 +76,11 @@ class CountryRulesTest extends TestCase
 
         $finding = $this->find($this->rules->findings($this->context($payload)), 'entered');
 
-        $this->assertSame('New in the top list: India (50.0% engaged, 5 booking-engine visits) looks genuine.', $this->plain($finding));
+        $this->assertSame('New in the top list: India (50.0% engaged, 5 booking-engine visits) shows genuine booking interest.', $this->plain($finding));
         $this->assertNull($finding->action);
     }
 
-    public function test_a_new_country_with_very_low_engagement_and_no_booking_activity_looks_suspicious(): void
+    public function test_a_new_country_with_very_low_engagement_and_no_booking_activity_needs_a_closer_look(): void
     {
         $payload = $this->payload2(
             [$this->country('Spain', 295, 200, 549, 23.5), $this->country('Lithuania', 10, null, 121, 1.0)],
@@ -90,7 +90,7 @@ class CountryRulesTest extends TestCase
 
         $finding = $this->find($this->rules->findings($this->context($payload)), 'entered');
 
-        $this->assertSame('New in the top list: Lithuania (8.3% engaged, 0 booking-engine visits) looks suspicious.', $this->plain($finding));
+        $this->assertSame('New in the top list: Lithuania (8.3% engaged, 0 booking-engine visits) needs a closer look.', $this->plain($finding));
         $this->assertSame('Check the Lithuania traffic in GA4 before counting it as demand.', $finding->action);
         $this->assertSame(2, $finding->actionPriority);
     }
@@ -114,17 +114,47 @@ class CountryRulesTest extends TestCase
             ['entered' => ['Peru']],
         ))), 'entered'));
 
-        $this->assertSame('New in the top list: Peru (50.0% engaged) looks genuine.', $text(50.0));
-        $this->assertSame('New in the top list: Peru (5.0% engaged) looks suspicious.', $text(5.0));
+        $this->assertSame('New in the top list: Peru (50.0% engaged) shows strong engagement.', $text(50.0));
+        $this->assertSame('New in the top list: Peru (5.0% engaged) needs a closer look.', $text(5.0));
     }
 
-    public function test_the_suspicious_engagement_limit_is_configurable(): void
+    public function test_the_three_new_country_tiers(): void
     {
-        $payload = $this->payload2([$this->country('Peru', 30.0, null, 100, 3.0)], ['entered' => ['Peru']], [$this->perf('Peru', 100, 30.0, 0.0)]);
+        $text = fn (float $engaged, float $visits) => $this->plain($this->find($this->rules->findings($this->context($this->payload2(
+            [$this->country('Peru', $engaged, null, 100, 3.0)],
+            ['entered' => ['Peru']],
+            [$this->perf('Peru', 100, $engaged, $visits)],
+        ))), 'entered'));
 
-        config(['report.insight.suspicious_engagement_percent' => 40]);
+        $this->assertStringContainsString('shows genuine booking interest', $text(50.0, 3.0));
+        $this->assertStringContainsString('shows some booking interest', $text(45.0, 2.0));   // not enough visits for "genuine"
+        $this->assertStringContainsString('shows some booking interest', $text(30.0, 1.0));
+        $this->assertStringContainsString('needs a closer look', $text(29.9, 5.0));
+        $this->assertStringContainsString('needs a closer look', $text(63.6, 0.0));           // engaged, but no booking visits
+    }
 
-        $this->assertStringContainsString('looks suspicious', $this->plain($this->find($this->rules->findings($this->context($payload)), 'entered')));
+    public function test_genuine_is_never_said_below_three_booking_visits(): void
+    {
+        $text = fn (float $visits) => $this->plain($this->find($this->rules->findings($this->context($this->payload2(
+            [$this->country('Peru', 90.0, null, 100, 3.0)],
+            ['entered' => ['Peru']],
+            [$this->perf('Peru', 100, 90.0, $visits)],
+        ))), 'entered'));
+
+        $this->assertStringNotContainsString('genuine', $text(2.0));
+        $this->assertStringNotContainsString('genuine', $text(1.0));
+        $this->assertStringContainsString('genuine', $text(3.0));
+    }
+
+    public function test_the_tier_thresholds_are_configurable(): void
+    {
+        $payload = $this->payload2([$this->country('Peru', 45.0, null, 100, 3.0)], ['entered' => ['Peru']], [$this->perf('Peru', 100, 45.0, 3.0)]);
+
+        $this->assertStringContainsString('shows some booking interest', $this->plain($this->find($this->rules->findings($this->context($payload)), 'entered')));
+
+        config(['report.insight.new_country.strong.min_engagement_percent' => 40]);
+
+        $this->assertStringContainsString('shows genuine booking interest', $this->plain($this->find($this->rules->findings($this->context($payload)), 'entered')));
     }
 
     public function test_several_new_countries_are_judged_one_by_one(): void
@@ -137,7 +167,7 @@ class CountryRulesTest extends TestCase
 
         $finding = $this->find($this->rules->findings($this->context($payload)), 'entered');
 
-        $this->assertSame('New in the top list: A (60.0% engaged, 4 booking-engine visits) looks genuine; B (5.0% engaged, 0 booking-engine visits) looks suspicious.', $this->plain($finding));
+        $this->assertSame('New in the top list: A (60.0% engaged, 4 booking-engine visits) shows genuine booking interest; B (5.0% engaged, 0 booking-engine visits) needs a closer look.', $this->plain($finding));
         $this->assertSame('Check the B traffic in GA4 before counting it as demand.', $finding->action);
     }
 

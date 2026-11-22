@@ -60,7 +60,7 @@ class InsightGeneratorTest extends TestCase
 
         $this->assertSame(['verdict', 'headline', 'paragraphs', 'priority', 'caution'], array_keys($insight));
         $this->assertSame('healthy growth', $insight['verdict']);
-        $this->assertStringStartsWith('This week is best described as healthy growth:', Rich::toPlain($insight['headline']));
+        $this->assertStringStartsWith('Traffic grew healthily this week:', Rich::toPlain($insight['headline']));
         $this->assertSame(
             ['Advertising', 'Website traffic', 'Where visitors came from', 'Countries', 'AI assistants', 'Search Console'],
             array_column($insight['paragraphs'], 'title'),
@@ -134,16 +134,23 @@ class InsightGeneratorTest extends TestCase
         $w = $this->allText($weekly);
         $m = $this->allText($monthly);
 
-        $this->assertStringContainsString('This week', $w);
-        $this->assertStringNotContainsString('This month', $w);
+        $this->assertStringContainsString('this week', $w);
+        $this->assertStringNotContainsString('this month', $w);
         $this->assertStringNotContainsString('last month', $w);
         $this->assertStringNotContainsString('Compared with October 2025', $w);
 
-        $this->assertStringContainsString('This month', $m);
-        $this->assertStringNotContainsString('This week', $m);
-        $this->assertStringContainsString('Compared with October 2025, sessions are up ▲ +100.0%', $m);
+        $this->assertStringContainsString('this month', $m);
+        $this->assertStringNotContainsString('this week', $m);
+        $this->assertStringContainsString('Compared with October 2025: sessions +100.0%', $m);
     }
 
+    public function test_the_insight_text_has_no_arrows_but_keeps_signed_values(): void
+    {
+        $text = $this->allText($this->generator->generate($this->payload()));
+
+        $this->assertDoesNotMatchRegularExpression('/[▲▼▬]/u', $text);
+        $this->assertStringContainsString('+25.0%', $text);
+    }
     public function test_the_priority_line_gives_the_one_or_two_most_useful_actions_from_the_rules_that_fired(): void
     {
         $payload = $this->payload('weekly', [
@@ -299,10 +306,10 @@ class InsightGeneratorTest extends TestCase
     {
         $insight = $this->generator->generate($this->fakePayload(FakeData::nandini(), ReportType::Weekly));
 
-        $this->assertStringContainsString('⟦pos|▲ +25.0%⟧', $insight['headline']);
+        $this->assertStringContainsString('⟦pos|+25.0%⟧', $insight['headline']);
         $this->assertStringContainsString('⟦b|', $insight['paragraphs'][1]['text']);
         $this->assertStringNotContainsString('⟦', Rich::toPlain($insight['headline']));
-        $this->assertStringContainsString('▲ +25.0%', Rich::toPlain($insight['headline']));   // the sign and arrow survive without color
+        $this->assertStringContainsString('+25.0%', Rich::toPlain($insight['headline']));   // the sign and arrow survive without color
     }
 
     public function test_another_generator_can_replace_the_rule_based_one_with_one_binding(): void

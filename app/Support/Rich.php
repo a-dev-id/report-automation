@@ -35,10 +35,11 @@ final class Rich
      * A change as a bold colored token with its arrow and sign.
      *
      * @param  array{text: string, arrow: string, kind: string}  $change  from ReportFormat::change()
+     * @param  bool  $arrow  false inside sentences ("fell -9.8%"): the sign carries the direction, arrows stay in tiles and tables
      */
-    public static function change(array $change): string
+    public static function change(array $change, bool $arrow = true): string
     {
-        $text = trim(($change['arrow'] !== '' ? $change['arrow'].' ' : '').$change['text']);
+        $text = trim(($arrow && $change['arrow'] !== '' ? $change['arrow'].' ' : '').$change['text']);
 
         return "⟦{$change['kind']}|{$text}⟧";
     }

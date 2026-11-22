@@ -8,8 +8,9 @@ namespace App\Services\Reports\Insight;
  * "Countries" paragraph. Countries are ranked by ENGAGED sessions (payload.countries), not by raw sessions.
  *
  *   overview        which countries bring the most engaged visitors, with their share of engaged sessions
- *   entered         countries that entered the top list: do they look genuine (engagement and booking activity) or suspicious
- *                   (very low engagement and no booking activity)? Threshold: suspicious_engagement_percent
+ *   entered         countries that entered the top list, in three tiers from engagement and booking-engine visits (config
+ *                   insight.new_country): strong (50%+ engaged and 3+ booking visits) "shows genuine booking interest", some (30%+ and
+ *                   1+ visit) "shows some booking interest", anything weaker "needs a closer look". "Genuine" is never used below 3 visits.
  *   dropped         countries that dropped out of the top list
  *   priorityMarkets combined share of config report.insight.priority_countries, and whether it grew
  *   botSuspects     Country Performance rows flagged "check for bots"
@@ -45,23 +46,25 @@ final class CountryRules
         return array_values(array_filter($countries['rows'] ?? [], fn (array $r) => ! ($r['isOther'] ?? false) && ($r['country'] ?? '') !== '(not set)'));
     }
 
+    /**
+     * The first time a share appears it says what it is a share of, and "engaged sessions" is explained once in plain words.
+     */
     public function overview(InsightContext $c, array $rows): ?Finding
     {
         $top = array_slice($rows, 0, 3);
-        $parts = array_map(function (array $r) use ($c) {
+        $parts = [];
+        foreach ($top as $i => $r) {
             $share = $r['engagedShare']['current'] ?? null;
-
-            return $r['country'].($share !== null ? ' ('.$c->value('pct', $share).')' : '');
-        }, $top);
+            $parts[] = $r['country'].($share !== null ? ' ('.$c->value('pct', $share).($i === 0 ? ' of engaged sessions' : '').')' : '');
+        }
 
         return new Finding(
-            'Ranked by engaged sessions, the most engaged visitors came from '.$c->join($parts).'.',
+            'Ranked by engaged sessions (visits where people actually interacted with the site), the most engaged visitors came from '.$c->join($parts).'.',
             weight: 100,
             essential: true,
             rule: 'overview',
         );
     }
-
     public function entered(InsightContext $c, array $rows): ?Finding
     {
         $entered = (array) ($c->section('countries')['entered'] ?? []);
@@ -70,10 +73,12 @@ final class CountryRules
         }
 
         $byName = array_column($rows, null, 'country');
-        $min = (float) $c->config('suspicious_engagement_percent', 20);
+        $strong = (array) $c->config('new_country.strong', ['min_engagement_percent' => 50, 'min_booking_visits' => 3]);
+        $some = (array) $c->config('new_country.some', ['min_engagement_percent' => 30, 'min_booking_visits' => 1]);
+        $weakBelow = (float) $c->config('new_country.weak.max_engagement_percent', 25);
+
         $parts = [];
-        $suspicious = [];
-        $real = 0;
+        $worrying = [];
 
         foreach (array_slice($entered, 0, 3) as $name) {
             $row = $byName[$name] ?? null;
@@ -85,19 +90,25 @@ final class CountryRules
             $engagement = $sessions > 0 ? (float) ($row['engagedSessions']['current'] ?? 0) / $sessions * 100 : 0.0;
             $visits = $this->bookingVisits($c, $name);
 
-            $engagementOk = $engagement >= $min;
-            $bookingOk = $visits !== null && $visits > 0;
-
             $detail = $c->value('pct', $engagement).' engaged'.($visits !== null ? ', '.$c->value('n', $visits).' booking-engine visits' : '');
 
-            if ($engagementOk && ($bookingOk || $visits === null)) {
-                $verdict = 'looks genuine';
-                $real++;
-            } elseif (! $engagementOk && ! $bookingOk) {
-                $verdict = 'looks suspicious';
-                $suspicious[] = $name;
+            if ($visits !== null) {
+                $verdict = match (true) {
+                    $engagement >= (float) $strong['min_engagement_percent'] && $visits >= (float) $strong['min_booking_visits'] => 'shows genuine booking interest',
+                    $engagement >= (float) $some['min_engagement_percent'] && $visits >= (float) $some['min_booking_visits'] => 'shows some booking interest',
+                    default => 'needs a closer look',
+                };
             } else {
-                $verdict = 'needs a closer look';
+                // No booking data for this country: judge on engagement only and never claim booking interest.
+                $verdict = match (true) {
+                    $engagement >= (float) $strong['min_engagement_percent'] => 'shows strong engagement',
+                    $engagement >= (float) $some['min_engagement_percent'] => 'shows moderate engagement',
+                    default => 'needs a closer look',
+                };
+            }
+
+            if ($engagement < $weakBelow && ($visits === null || $visits <= 0)) {
+                $worrying[] = $name;
             }
 
             $parts[] = "{$name} ({$detail}) {$verdict}";
@@ -110,11 +121,10 @@ final class CountryRules
         return new Finding(
             'New in the top list: '.implode('; ', $parts).'.',
             weight: 92,
-            action: $suspicious !== [] ? 'Check the '.$c->join(array_slice($suspicious, 0, 2)).' traffic in GA4 before counting it as demand.' : null,
+            action: $worrying !== [] ? 'Check the '.$c->join(array_slice($worrying, 0, 2)).' traffic in GA4 before counting it as demand.' : null,
             actionPriority: 2,
         );
     }
-
     public function dropped(InsightContext $c, array $rows): ?Finding
     {
         $dropped = array_slice((array) ($c->section('countries')['dropped'] ?? []), 0, 4);

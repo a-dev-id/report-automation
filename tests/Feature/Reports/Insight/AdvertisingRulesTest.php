@@ -46,8 +46,8 @@ class AdvertisingRulesTest extends TestCase
         $this->assertSame(1, $finding->actionPriority);
 
         $overview = $this->plain($this->find($findings, 'overview'));
-        $this->assertStringContainsString('Paid impressions rose ▲ +46.6% to 146,620', $overview);
-        $this->assertStringContainsString('clicks fell ▼ -16.1% to 839', $overview);
+        $this->assertStringContainsString('Paid impressions rose +46.6% to 146,620', $overview);
+        $this->assertStringContainsString('clicks fell -16.1% to 839', $overview);
     }
 
     public function test_the_reach_rule_needs_all_three_signals(): void
@@ -141,8 +141,8 @@ class AdvertisingRulesTest extends TestCase
         $overview = $this->find($this->findings($paid), 'overview');
 
         $this->assertTrue($overview->essential);
-        $this->assertStringContainsString('⟦neutral|▲ +17.8%⟧', $overview->text);    // cost: gray, not green or red
-        $this->assertStringContainsString('⟦pos|▲ +25.0%⟧', $overview->text);        // impressions: a rise is green
+        $this->assertStringContainsString('⟦neutral|+17.8%⟧', $overview->text);    // cost: gray, not green or red
+        $this->assertStringContainsString('⟦pos|+25.0%⟧', $overview->text);        // impressions: a rise is green
         $this->assertStringContainsString('IDR 5,890,000', $this->plain($overview));
     }
 

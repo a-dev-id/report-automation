@@ -265,8 +265,9 @@ final class ReportViewData
                     'engaged' => ReportFormat::number($r['engagedSessions'] ?? null),
                     'engagement' => isset($r['engagementRate']) ? ReportFormat::rate($r['engagementRate']) : '–',
                     'bookingVisits' => ($r['bookingEngineVisits'] ?? null) === null ? '–' : ReportFormat::number($r['bookingEngineVisits']),
-                    'quality' => (string) ($r['quality'] ?? ''),
-                    'flag' => $r['flag'] ?? (($r['checkForBots'] ?? false) ? 'check for bots' : null),
+                    // "Low Intent" is shown as "Low intent"; a flagged row says "possible bots" in a small second line.
+                    'quality' => ucfirst(strtolower((string) ($r['quality'] ?? ''))),
+                    'flag' => ($r['flag'] ?? null) !== null || ($r['checkForBots'] ?? false) ? 'possible bots' : null,
                 ];
             }, $rows),
         ];

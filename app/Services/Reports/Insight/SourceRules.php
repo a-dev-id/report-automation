@@ -97,10 +97,13 @@ final class SourceRules
                 continue;
             }
 
+            // The overview has already said this channel's share of sessions, so it is not repeated here.
+            $opening = $lowEngagement
+                ? 'Only '.$c->value('rate', $engagement).' of '.$row['channel'].' visits were engaged (average visit '.$c->value('dur', $duration).').'
+                : $row['channel'].' visits are very short (average visit '.$c->value('dur', $duration).'), with '.$c->value('rate', $engagement).' engaged.';
+
             return new Finding(
-                $row['channel'].' is '.$c->value('pct', $share).' of sessions, but only '.$c->value('rate', $engagement)
-                .' of those visits were engaged (average visit '.$c->value('dur', $duration).'). This is likely automated or low-quality traffic '
-                .'that inflates sessions and lowers averages, so do not read it as demand.',
+                $opening.' This is likely automated or low-quality traffic that inflates sessions and lowers averages, so do not read it as demand.',
                 weight: 98,
                 action: 'Check bot and referral filtering in GA4.',
                 actionPriority: 1,
@@ -129,8 +132,9 @@ final class SourceRules
         $out = [];
         foreach (array_slice($movers, 0, 2) as $m) {
             $out[] = new Finding(
-                $m['row']['channel']."'s share of sessions moved from ".$c->value('pct', $m['row']['share']['previous'] ?? null).' to '.$c->value('pct', $m['row']['share']['current'])
-                .' ('.$c->change(['direction' => $m['points'] > 0 ? 'up' : 'down', 'percent' => 0, 'improved' => null, 'difference' => $m['points'] / 100], null, true).').',
+                $m['row']['channel']."'s share of sessions ".($m['points'] > 0 ? 'rose ' : 'fell ')
+                .$c->change(['direction' => $m['points'] > 0 ? 'up' : 'down', 'percent' => 0, 'improved' => null, 'difference' => $m['points'] / 100], null, true)
+                .' from '.$c->value('pct', $m['row']['share']['previous'] ?? null).'.',
                 weight: 70,
             );
         }

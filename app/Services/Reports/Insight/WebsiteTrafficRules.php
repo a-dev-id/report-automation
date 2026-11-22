@@ -75,7 +75,12 @@ final class WebsiteTrafficRules
             return null;
         }
 
-        $change = $c->dir($top['views']) === 'guarded' ? '' : ', '.$c->change($top['views']['change']);
+        $direction = $c->dir($top['views']);
+        $change = match (true) {
+            $direction === 'guarded' => '',
+            $direction === 'new' => ', new this period',
+            default => ', '.$c->change($top['views']['change']),
+        };
 
         return new Finding('The most visited offer was '.$top['name'].' ('.$c->value('n', $top['views']['current']).' views'.$change.').', weight: 66);
     }
@@ -91,11 +96,11 @@ final class WebsiteTrafficRules
         foreach ([['sessions', 'Sessions', 'sessions'], ['keyEvents', 'Key events', 'key events'], ['bookingEngineVisits', 'Booking-engine visits', 'booking-engine visits']] as [$key, $label, $words]) {
             $phrase = $c->yearAgoPhrase($site[$key] ?? null, $label);
             if ($phrase !== null) {
-                $parts[] = "{$words} are {$phrase}";
+                $parts[] = "{$words} {$phrase}";
             }
         }
 
-        return $parts === [] ? null : new Finding('Compared with '.$c->yearAgoName.', '.$c->join($parts).'.', weight: 86);
+        return $parts === [] ? null : new Finding('Compared with '.$c->yearAgoName.': '.$c->join($parts).'.', weight: 86);
     }
 
     public function growthLowQuality(InsightContext $c, array $site): ?Finding
@@ -160,6 +165,11 @@ final class WebsiteTrafficRules
         return null;
     }
 
+    /**
+     * The booking-engine rate (booking-engine sessions / sessions). It is only interpreted when it moved by at least
+     * booking_rate.min_points percentage points or booking_rate.min_relative_percent percent AND the booking-engine visits reach
+     * booking_rate.min_visits in either period. A smaller move on enough volume is stated as numbers only; too little volume says nothing.
+     */
     public function bookingRate(InsightContext $c, array $site): ?Finding
     {
         $visits = $site['bookingEngineVisits'] ?? null;
@@ -174,6 +184,21 @@ final class WebsiteTrafficRules
             return null;
         }
 
+        $minVisits = (float) $c->config('booking_rate.min_visits', 20);
+        if (max((float) ($visits['current'] ?? 0), (float) ($visits['previous'] ?? 0)) < $minVisits) {
+            return null;   // too few booking-engine visits for a rate to mean anything
+        }
+
+        $points = abs($now - $before);
+        $relative = $before > 0 ? $points / $before * 100 : 100.0;
+
+        if ($points < (float) $c->config('booking_rate.min_points', 0.5) && $relative < (float) $c->config('booking_rate.min_relative_percent', 15)) {
+            return new Finding(
+                'The booking-engine rate was '.$c->value('pct', $now).' of sessions, against '.$c->value('pct', $before).' '.$c->previousShort().'.',
+                weight: 55,
+            );
+        }
+
         $up = $now > $before;
 
         return new Finding(
@@ -182,7 +207,6 @@ final class WebsiteTrafficRules
             weight: 88,
         );
     }
-
     public function purchases(InsightContext $c, array $site): ?Finding
     {
         $purchases = $site['purchases'] ?? null;

@@ -158,7 +158,7 @@ final class SearchConsoleRules
 
         // Position is "lower is better": Compare::change marks a drop in the number as improved, so ReportFormat colors it green.
         $word = ($change['improved'] ?? null) === true ? 'improved' : 'slipped';
-        $token = Rich::change(ReportFormat::change($change));
+        $token = Rich::change(ReportFormat::change($change), arrow: false);
 
         return "The average position {$word} from ".$c->value('pos', $before)." to {$now} ({$token}); a lower number is better.";
     }

@@ -140,8 +140,11 @@ return [
     |       (or an average session shorter than traffic_quality.bot_check.max_avg_session_seconds) is flagged as likely
     |       automated or low-quality traffic.
     |   share_move_points : a channel share that moved by more than this many points gets a sentence.
-    |   suspicious_engagement_percent : a country that entered the top list below this engagement, with no booking activity, is
-    |       called suspicious.
+    |   booking_rate : the booking-engine rate is only interpreted when it moved by min_points percentage points or min_relative_percent
+    |       percent AND the booking-engine visits reach min_visits in either period; a smaller move is stated as numbers only.
+    |   new_country : tiers for a country that entered the top list. strong (min_engagement_percent and min_booking_visits) =
+    |       "shows genuine booking interest", some = "shows some booking interest", anything else "needs a closer look". weak.max_engagement_percent
+    |       is the engagement below which a country with no booking visits also gets a "check it in GA4" action.
     |   ai.min_sessions : the AI assistants paragraph needs at least this many sessions.
     |   awareness_terms : campaign names containing one of these are described as awareness, not demand.
     |   offer_path_prefix : pages under this path are the hotel's offers (Most visited offers). Empty = no offers section.
@@ -161,6 +164,12 @@ return [
         'dominant_channel' => ['min_share_percent' => 40, 'max_engagement_percent' => 25],
         'share_move_points' => 10,
         'suspicious_engagement_percent' => 20,
+        'booking_rate' => ['min_points' => 0.5, 'min_relative_percent' => 15, 'min_visits' => 20],
+        'new_country' => [
+            'strong' => ['min_engagement_percent' => 50, 'min_booking_visits' => 3],
+            'some' => ['min_engagement_percent' => 30, 'min_booking_visits' => 1],
+            'weak' => ['max_engagement_percent' => 25],
+        ],
         'ai' => ['min_sessions' => 20],
         'awareness_terms' => ['awareness', 'display', 'reach', 'video'],
         'offer_path_prefix' => '/offer/',

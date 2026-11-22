@@ -84,12 +84,12 @@ class ReportContentParityTest extends TestCase
         [$html] = $this->render($this->report());
         $flat = $this->flat($html);
 
-        $this->assertStringContainsString('best described as healthy growth', $html);
+        $this->assertStringContainsString('Traffic grew healthily this week', $html);
         foreach (['Advertising', 'Website traffic', 'Where visitors came from', 'Countries', 'AI assistants', 'Search Console'] as $title) {
             $this->assertMatchesRegularExpression('/font-weight:bold; color:#1F6F8B; padding:12px 0 2px 0;">'.preg_quote($title, '/').'<\/td>/', $flat, $title);
         }
         // A value and its change are bold spans with an inline color: no classes.
-        $this->assertStringContainsString('<span style="font-weight:bold; color:#15803D;">▲ +25.0%</span>', $html);
+        $this->assertStringContainsString('<span style="font-weight:bold; color:#15803D;">+25.0%</span>', $html);
         $this->assertStringContainsString('<span style="font-weight:bold; color:#111827;">10,000</span>', $html);
         $this->assertStringNotContainsString('class=', $html);
         $this->assertStringNotContainsString('⟦', $html);                       // no raw markup leaks
@@ -213,7 +213,7 @@ class ReportContentParityTest extends TestCase
         $flat = $this->flat($html);
 
         $this->assertStringContainsString('alt="Top countries by engaged sessions"', $html);    // the chart ...
-        $this->assertMatchesRegularExpression('/Country<\/th>\s*<th[^>]*>Engaged<\/th>\s*<th[^>]*>Share<\/th>\s*<th[^>]*>Change<\/th>\s*<th[^>]*>Sessions<\/th>/', $flat);   // ... and the table
+        $this->assertMatchesRegularExpression('/Country<\/th>\s*<th[^>]*>Engaged<\/th>\s*<th[^>]*>Share of engaged<\/th>\s*<th[^>]*>Engaged change<\/th>\s*<th[^>]*>Sessions<\/th>/', $flat);   // ... and the table
         $this->assertMatchesRegularExpression('/>Indonesia<\/td>\s*<td[^>]*font-weight:bold;">1,500<\/td>\s*<td[^>]*>28\.9%<\/td>/', $flat);
         $this->assertMatchesRegularExpression('/>India<\/td>.*?▲ New/', $flat);
         $this->assertStringContainsString('Dropped from the current top countries: Brazil.', $html);
@@ -226,9 +226,10 @@ class ReportContentParityTest extends TestCase
         [$html] = $this->render($this->report());
         $flat = $this->flat($html);
 
-        $this->assertSame(1, preg_match('#Country performance.*?<th[^>]*>Country</th>\s*<th[^>]*>Sessions</th>\s*<th[^>]*>Share</th>\s*<th[^>]*>Engaged</th>\s*<th[^>]*>Engagement</th>\s*<th[^>]*>Booking visits</th>\s*<th[^>]*>Quality</th>#', $flat));
+        $this->assertSame(1, preg_match('#Country performance.*?<th[^>]*>Country</th>\s*<th[^>]*>Sessions</th>\s*<th[^>]*>Share of sessions</th>\s*<th[^>]*>Engaged</th>\s*<th[^>]*>Engaged rate</th>\s*<th[^>]*>Booking visits</th>\s*<th[^>]*>Quality</th>#', $flat));
         $this->assertMatchesRegularExpression('/Indonesia\s*(?:<br>\s*<span[^>]*>[^<]*<\/span>)?\s*<\/td>\s*<td[^>]*>3,000<\/td>\s*<td[^>]*>30\.0%<\/td>\s*<td[^>]*>1,500<\/td>/', $flat);   // 3000 of 10000 sessions, 1500 engaged
-        $this->assertStringContainsString('check for bots', $html);
+        $this->assertStringContainsString('possible bots', $html);
+        $this->assertStringContainsString('strongest traffic source, so session totals can differ', $html);
     }
 
     // ---- paid ---------------------------------------------------------------------------------------
@@ -310,7 +311,7 @@ class ReportContentParityTest extends TestCase
     {
         [$html, $text] = $this->render($this->report());
 
-        foreach (['best described as healthy growth', 'Paid impressions rose', 'The remaining 5.0%', 'Ranked by engaged sessions', '10,000', 'IDR 9,000,000', '46.0%'] as $needle) {
+        foreach (['Traffic grew healthily this week', 'Paid impressions rose', 'The remaining 5.0%', 'Ranked by engaged sessions', '10,000', 'IDR 9,000,000', '46.0%'] as $needle) {
             if ($needle === '46.0%') {
                 continue;   // brand share only with brand terms
             }

@@ -59,13 +59,14 @@ final class AiRules
             return null;
         }
 
-        $parts = array_map(function (array $r) use ($c) {
+        $parts = [];
+        foreach ($rows as $i => $r) {
             $change = ($r['isNew'] ?? false)
                 ? $c->change(['direction' => 'new'])
                 : ($c->guarded($r['change'] ?? null) ? null : $c->change($r['change'] ?? null));
 
-            return $r['country'].' ('.$c->value('pct', $r['share'] ?? null).($change !== null ? ', '.$change : '').')';
-        }, $rows);
+            $parts[] = $r['country'].' ('.$c->value('pct', $r['share'] ?? null).($i === 0 ? ' of AI sessions' : '').($change !== null ? ', '.$change : '').')';
+        }
 
         $text = 'Most AI visitors came from '.$c->join($parts).'.';
         $dropped = array_slice((array) ($ai['droppedCountries'] ?? []), 0, 3);

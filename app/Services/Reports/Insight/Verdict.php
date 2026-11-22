@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Reports\Insight;
 
 /**
- * The one-sentence verdict that opens the insight. It looks at sessions, engagement and booking-engine visits TOGETHER, never one
+ * The one-sentence verdict that opens the insight ("Traffic declined this week: sessions fell -9.8% to 6,545, ..."). It looks at sessions, engagement and booking-engine visits TOGETHER, never one
  * metric alone:
  *
  *   healthy growth             sessions up, and engagement and booking visits are not worse
@@ -19,12 +19,13 @@ namespace App\Services\Reports\Insight;
  */
 final class Verdict
 {
-    public const LABELS = [
-        'healthy growth' => 'healthy growth',
-        'growth with weaker quality' => 'growth with weaker quality',
-        'decline' => 'a decline',
-        'stable' => 'stable',
-        'mixed' => 'mixed',
+    /** How the headline opens for each verdict, with the period ("this week") added after it. */
+    public const OPENINGS = [
+        'healthy growth' => 'Traffic grew healthily',
+        'growth with weaker quality' => 'Traffic grew, but quality weakened',
+        'decline' => 'Traffic declined',
+        'stable' => 'Traffic was stable',
+        'mixed' => 'Traffic was mixed',
     ];
 
     /** @return array{key: string|null, headline: string} */
@@ -52,7 +53,7 @@ final class Verdict
 
         $headline = $key === null
             ? $c->thisPeriod.': '.$c->join($facts).'.'
-            : $c->thisPeriod.' is best described as '.self::LABELS[$key].': '.$c->join($facts).'.';
+            : self::OPENINGS[$key].' '.lcfirst($c->thisPeriod).': '.$c->join($facts).'.';
 
         return ['key' => $key, 'headline' => $headline];
     }

@@ -42,7 +42,7 @@ class SourceRulesTest extends TestCase
         ], [['channel' => 'Referral', 'sessions' => 60.0, 'share' => 3.0], ['channel' => 'Email', 'sessions' => 40.0, 'share' => 2.0]]);
 
         $this->assertSame(
-            'Direct was the largest source at 60.0% of sessions (▲ +18.7% in sessions), followed by Display (20.0%) and Organic Search (10.0%). '
+            'Direct was the largest source at 60.0% of sessions (+18.7% in sessions), followed by Display (20.0%) and Organic Search (10.0%). '
             .'The remaining 10.0% came from Paid Search, Referral and Email.',
             $this->plain($this->find($findings, 'overview')),
         );
@@ -68,7 +68,7 @@ class SourceRulesTest extends TestCase
         $finding = $this->find($findings, 'dominantLowQuality');
 
         $this->assertSame(
-            'Direct is 68.1% of sessions, but only 13.9% of those visits were engaged (average visit 22s). '
+            'Only 13.9% of Direct visits were engaged (average visit 22s). '
             .'This is likely automated or low-quality traffic that inflates sessions and lowers averages, so do not read it as demand.',
             $this->plain($finding),
         );
@@ -76,6 +76,16 @@ class SourceRulesTest extends TestCase
         $this->assertSame(1, $finding->actionPriority);
     }
 
+    public function test_the_dominant_channel_share_is_not_repeated_in_the_same_paragraph_finding(): void
+    {
+        $findings = $this->findings([
+            $this->channel('Direct', 4406, 3713, 68.1, 50.0, engagement: 0.139, duration: 21.8),
+            $this->channel('Display', 795, 1592, 12.1, 21.0),
+        ]);
+
+        // The overview states the 68.1% share; the quality finding must not state it again.
+        $this->assertSame(1, substr_count($this->plain($this->find($findings, 'overview')).' '.$this->plain($this->find($findings, 'dominantLowQuality')), '68.1%'));
+    }
     public function test_a_very_short_average_visit_also_counts_even_with_ok_engagement(): void
     {
         $findings = $this->findings([$this->channel('Direct', 500, 400, 55.0, 50.0, engagement: 0.5, duration: 3.0)]);
@@ -127,8 +137,8 @@ class SourceRulesTest extends TestCase
         $moves = array_values(array_filter($findings, fn ($f) => $f->rule === 'shareMoves'));
 
         $this->assertCount(2, $moves);
-        $this->assertSame("Organic Search's share of sessions moved from 40.0% to 15.0% (▼ -25.0 pts).", $this->plain($moves[0]));   // biggest move first
-        $this->assertSame("Display's share of sessions moved from 20.0% to 35.0% (▲ +15.0 pts).", $this->plain($moves[1]));
+        $this->assertSame("Organic Search's share of sessions fell -25.0 pts from 40.0%.", $this->plain($moves[0]));   // biggest move first
+        $this->assertSame("Display's share of sessions rose +15.0 pts from 20.0%.", $this->plain($moves[1]));
         $this->assertStringContainsString('⟦zero|', $moves[0]->text);   // a share moving is neither good nor bad: gray
     }
 

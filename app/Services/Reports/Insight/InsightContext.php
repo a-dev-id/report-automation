@@ -105,6 +105,12 @@ final class InsightContext
         $this->flagged["{$label}|{$against}"] = ['label' => $label, 'percent' => (float) $change['percent'], 'against' => $against];
     }
 
+    /** "before" for the comparison period in a short phrase: "last week" or "last month". */
+    public function previousShort(): string
+    {
+        return $this->monthly ? 'last month' : 'last week';
+    }
+
     /** One neutral sentence for every metric the guard held back, or null. */
     public function largeChangeSentence(): ?string
     {
@@ -151,7 +157,7 @@ final class InsightContext
     /** A change as a bold colored token (arrow and sign included). */
     public function change(?array $change, ?string $metricKey = null, bool $rate = false): string
     {
-        return Rich::change($rate ? ReportFormat::rateChange($change, $metricKey) : ReportFormat::change($change, $metricKey));
+        return Rich::change($rate ? ReportFormat::rateChange($change, $metricKey) : ReportFormat::change($change, $metricKey), arrow: false);
     }
 
     /**
@@ -176,7 +182,7 @@ final class InsightContext
         }
 
         $styled = $kind === 'rate' ? ReportFormat::rateChange($change, $metricKey) : ReportFormat::change($change, $metricKey);
-        $token = Rich::change($styled);
+        $token = Rich::change($styled, arrow: false);
 
         return match ($styled['direction']) {
             'up' => "rose {$token} to {$value}",
@@ -187,7 +193,7 @@ final class InsightContext
         };
     }
 
-    /** "up ▲ +100.0%" for the year-ago comparison, or null (not monthly, no data, flat/none, or guarded and noted). */
+    /** The signed year-ago change ("+100.0%") as a colored token, or null (not monthly, no data, flat/none, or guarded and noted). */
     public function yearAgoPhrase(?array $metric, ?string $label = null, ?string $metricKey = null): ?string
     {
         if ($metric === null || ! array_key_exists('yearAgoChange', $metric)) {
@@ -199,7 +205,7 @@ final class InsightContext
             return null;
         }
 
-        return ($direction === 'up' ? 'up ' : 'down ').$this->change($metric['yearAgoChange'], $metricKey);
+        return $this->change($metric['yearAgoChange'], $metricKey);
     }
 
     /** Percentage-point move of a rate metric (fractions): current minus previous, or null without both values. */
