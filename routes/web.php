@@ -25,7 +25,7 @@ Route::get('/reports/preview/{property}/{type}/{periodStart}', function (string 
     try {
         $result = $preview->render($model, $reportType, $periodStart, withCharts: request()->query('charts') !== '0');
     } catch (InvalidArgumentException) {
-        abort(404);   // not a Monday / not the 1st
+        abort(404);   // not a valid date / monthly not on the 1st
     }
 
     return response($result['html'])->header('Content-Type', 'text/html; charset=utf-8');

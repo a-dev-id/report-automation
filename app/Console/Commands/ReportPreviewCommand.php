@@ -16,7 +16,7 @@ class ReportPreviewCommand extends Command
     protected $signature = 'report:preview
         {property : Property slug}
         {type : weekly or monthly}
-        {periodStart? : Period start, Y-m-d (a Monday for weekly, the 1st for monthly). Default: the latest complete period}
+        {periodStart? : Period start, Y-m-d (any day for weekly, a 7-day range, the 1st for monthly). Default: the latest complete period}
         {--no-charts : Do not render charts (tables are shown instead)}
         {--out= : Write the HTML to this file instead of the default}
         {--fresh : Ignore the stored report and the cached preview payload and build a new one (calls Google)}';

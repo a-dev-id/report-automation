@@ -102,7 +102,7 @@ Data notes show: "Search Console data through <date>" when the last days are mis
 ## Preview (no mail is sent, nothing is saved to reports or deliveries)
 
 ```
-php artisan report:preview nandini weekly 2026-11-09          # a Monday
+php artisan report:preview nandini weekly 2026-11-09          # any start day: covers 7 days (9 to 15 Nov)
 php artisan report:preview nandini monthly 2026-10-01 --no-charts
 php artisan report:preview nandini weekly --fresh --out=C:\temp\p.html
 ```

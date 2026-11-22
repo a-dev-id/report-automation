@@ -166,9 +166,22 @@ class ReportPreviewTest extends TestCase
         $this->assertNotSame(0, $exit);
         $this->assertStringContainsString("No property with slug 'nope'", $output);
 
-        [$exit, $output] = $this->preview(['periodStart' => '2026-11-10']);   // a Tuesday
+        [$exit, $output] = $this->preview(['type' => 'monthly', 'periodStart' => '2026-10-02']);   // not the 1st
         $this->assertNotSame(0, $exit);
-        $this->assertStringContainsString('must start on a Monday', $output);
+        $this->assertStringContainsString('must start on the 1st', $output);
+
+        [$exit, $output] = $this->preview(['periodStart' => '2026-13-45']);
+        $this->assertNotSame(0, $exit);
+    }
+
+    public function test_a_weekly_preview_accepts_any_start_day_and_covers_seven_days(): void
+    {
+        $this->nandini();
+
+        [$exit, $output] = $this->preview(['periodStart' => '2026-11-08']);   // a Sunday: 8 to 14 Nov
+
+        $this->assertSame(0, $exit);
+        $this->assertStringContainsString('Subject: Nandini Weekly Traffic Report: 8 to 14 Nov 2026', $output);
     }
 
     public function test_monthly_preview_for_a_given_month(): void
@@ -224,7 +237,7 @@ class ReportPreviewTest extends TestCase
         $this->get('/reports/preview/unknown/weekly/2026-11-09')->assertNotFound();
         $this->get('/reports/preview/nandini/daily/2026-11-09')->assertNotFound();
         $this->get('/reports/preview/nandini/weekly/not-a-date')->assertNotFound();
-        $this->get('/reports/preview/nandini/weekly/2026-11-10')->assertNotFound();   // not a Monday
+        $this->get('/reports/preview/nandini/monthly/2026-10-02')->assertNotFound();   // monthly must be the 1st
     }
 
     public function test_the_route_can_skip_charts(): void

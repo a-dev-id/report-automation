@@ -14,7 +14,8 @@ use InvalidArgumentException;
  * One reporting period (a week or a calendar month) and the periods it is compared with.
  *
  * All dates are calendar days in the property's timezone. Start and end are both inclusive.
- * Weekly: Monday to Sunday, compared with the week before.
+ * Weekly: any 7-day range (start + 6 days), compared with the 7 days before it. The scheduled run uses the last
+ * complete Monday to Sunday week; a manual start date may be any day.
  * Monthly: 1st to last day, compared with the month before and the same month last year.
  *
  * This class uses only native PHP date classes so it can be tested without Laravel.
@@ -66,10 +67,6 @@ final class ReportPeriod
         }
 
         if ($type === ReportType::Weekly) {
-            if ($start->format('N') !== '1') {
-                throw new InvalidArgumentException("A weekly period must start on a Monday: {$startDate}");
-            }
-
             return self::weekFrom($start);
         }
 

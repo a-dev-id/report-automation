@@ -202,9 +202,9 @@ class ReportSendTestTest extends TestCase
         $this->assertNotSame(0, $exit);
         $this->assertStringContainsString('weekly or monthly', $output);
 
-        [$exit, $output] = $this->sendTest(['property' => 'nandini', 'type' => 'weekly', 'periodStart' => '2026-11-10', '--to' => 'me@example.test']);
+        [$exit, $output] = $this->sendTest(['property' => 'nandini', 'type' => 'monthly', 'periodStart' => '2026-10-02', '--to' => 'me@example.test']);
         $this->assertNotSame(0, $exit);
-        $this->assertStringContainsString('Monday', $output);
+        $this->assertStringContainsString('1st', $output);
 
         Mail::assertNothingSent();
     }
@@ -347,8 +347,8 @@ class ReportSendTestTest extends TestCase
             }
         }
 
-        // A Tuesday is not a week start: rejected with a message, not a 500.
-        $this->postTest(['period_start' => '2026-11-10'] + $valid, $this->token)->assertStatus(422)->assertJsonPath('ok', false);
+        // A monthly report must start on the 1st: rejected with a message, not a 500.
+        $this->postTest(['period_start' => '2026-10-02', 'type' => 'monthly'] + $valid, $this->token)->assertStatus(422)->assertJsonPath('ok', false);
 
         Mail::assertNothingSent();
         $this->assertSame(0, ReportDelivery::count());

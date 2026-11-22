@@ -16,7 +16,7 @@ class ReportSendTestCommand extends Command
     protected $signature = 'report:send-test
         {property : Property slug}
         {type : weekly or monthly}
-        {periodStart? : Period start, Y-m-d (a Monday for weekly, the 1st for monthly). Default: the latest complete period}
+        {periodStart? : Period start, Y-m-d (any day for weekly, a 7-day range, the 1st for monthly). Default: the latest complete period}
         {--to= : Address to send to (required). Several addresses can be separated by commas}';
 
     protected $description = 'Send one report email, prefixed "[TEST] ", ONLY to the address(es) in --to. No recipients table, no deliveries, no report record';

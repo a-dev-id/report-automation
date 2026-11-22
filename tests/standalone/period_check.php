@@ -94,10 +94,11 @@ check('monthly: run just after midnight on the 1st', ranges($p)['current'], ['20
 
 // ---- fromStart ----
 check('fromStart weekly', ranges(ReportPeriod::fromStart(ReportType::Weekly, '2026-11-16', $mak))['current'], ['2026-11-16', '2026-11-22']);
+check('fromStart weekly, any start day (Sunday 8 Nov)', ranges(ReportPeriod::fromStart(ReportType::Weekly, '2026-11-08', $mak))['current'], ['2026-11-08', '2026-11-14']);
+check('fromStart weekly, previous 7 days', ranges(ReportPeriod::fromStart(ReportType::Weekly, '2026-11-08', $mak))['previous'], ['2026-11-01', '2026-11-07']);
 check('fromStart monthly', ranges(ReportPeriod::fromStart(ReportType::Monthly, '2026-10-01', $mak))['current'], ['2026-10-01', '2026-10-31']);
 
 foreach ([
-    'weekly start not Monday' => [ReportType::Weekly, '2026-11-17'],
     'monthly start not the 1st' => [ReportType::Monthly, '2026-10-02'],
     'impossible date' => [ReportType::Monthly, '2026-02-30'],
     'bad format' => [ReportType::Weekly, '16-11-2026'],
