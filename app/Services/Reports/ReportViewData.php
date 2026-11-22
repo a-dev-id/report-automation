@@ -70,6 +70,8 @@ final class ReportViewData
             'channels' => $channels,
             'countries' => $countries,
             'countryPerformance' => self::countryPerformance($payload),
+            'pages' => self::pageList($payload, 'top_pages', 'Most visited pages'),
+            'offers' => self::pageList($payload, 'top_offers', 'Most visited offers'),
             'paid' => self::paid($payload),
             'ai' => self::ai($payload),
             'searchConsole' => $searchConsole,
@@ -267,6 +269,35 @@ final class ReportViewData
                     'flag' => $r['flag'] ?? (($r['checkForBots'] ?? false) ? 'check for bots' : null),
                 ];
             }, $rows),
+        ];
+    }
+
+    /**
+     * Most visited pages or offers: name, views (bold, with change), users. Left out when there are none.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function pageList(array $payload, string $key, string $title): ?array
+    {
+        if (self::failed($payload, $key)) {
+            return ['title' => $title, 'unavailable' => true];
+        }
+        $list = self::ok($payload, $key);
+        if (($list['rows'] ?? []) === []) {
+            return null;
+        }
+
+        return [
+            'title' => $title,
+            'unavailable' => false,
+            'total' => ReportFormat::number($list['total']['current'] ?? null),
+            'rows' => array_map(fn (array $r) => [
+                'name' => (string) $r['name'],
+                'path' => (string) $r['path'],
+                'views' => ReportFormat::number($r['views']['current']),
+                'users' => ReportFormat::number($r['users']),
+                'change' => ReportFormat::change($r['views']['change'] ?? null, 'views'),
+            ], $list['rows']),
         ];
     }
 

@@ -59,7 +59,7 @@ class ReportBuilderTest extends TestCase
         $payload = $this->build(FakeData::nandini(), ReportType::Weekly);
 
         $this->assertSame(
-            ['meta', 'site', 'channels', 'countries', 'country_performance', 'ai_traffic', 'paid', 'trend', 'search_console', 'quality_alerts'],
+            ['meta', 'site', 'channels', 'countries', 'country_performance', 'top_pages', 'top_offers', 'ai_traffic', 'paid', 'trend', 'search_console', 'quality_alerts'],
             array_keys($payload),
         );
 

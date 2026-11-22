@@ -72,6 +72,8 @@ return [
         'ai_landing_pages' => [3, 3],
         'search_queries' => [5, 10],
         'search_pages' => [5, 10],
+        'pages' => [5, 5],
+        'offers' => [5, 5],
     ],
 
     /*
@@ -142,6 +144,7 @@ return [
     |       called suspicious.
     |   ai.min_sessions : the AI assistants paragraph needs at least this many sessions.
     |   awareness_terms : campaign names containing one of these are described as awareness, not demand.
+    |   offer_path_prefix : pages under this path are the hotel's offers (Most visited offers). Empty = no offers section.
     |   priority_countries : your priority markets (names as GA4 spells them). Empty = skipped.
     |   brand_terms : words that mark a brand search query (for Search Console). Empty = brand share is skipped.
     |       REPORT_INSIGHT_BRAND_TERMS can hold a comma separated list.
@@ -160,6 +163,7 @@ return [
         'suspicious_engagement_percent' => 20,
         'ai' => ['min_sessions' => 20],
         'awareness_terms' => ['awareness', 'display', 'reach', 'video'],
+        'offer_path_prefix' => '/offer/',
         'priority_countries' => [],
         'brand_terms' => array_values(array_filter(array_map('trim', explode(',', (string) env('REPORT_INSIGHT_BRAND_TERMS', ''))))),
         'properties' => [],

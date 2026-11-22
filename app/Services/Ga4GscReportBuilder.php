@@ -10,6 +10,7 @@ use App\Models\Property;
 use App\Reports\QualityAlerts;
 use App\Reports\Queries\AiReferralTraffic;
 use App\Reports\Queries\CountryPerformance;
+use App\Reports\Queries\PageViews;
 use App\Reports\Queries\PaidPerformance;
 use App\Reports\Queries\SearchConsoleTotals;
 use App\Reports\Queries\SiteTotals;
@@ -40,6 +41,7 @@ class Ga4GscReportBuilder implements ReportBuilder
         private readonly TrafficByChannel $channels,
         private readonly TrafficByCountry $countries,
         private readonly CountryPerformance $countryPerformance,
+        private readonly PageViews $pageViews,
         private readonly AiReferralTraffic $aiTraffic,
         private readonly PaidPerformance $paid,
         private readonly Trend $trend,
@@ -65,6 +67,8 @@ class Ga4GscReportBuilder implements ReportBuilder
             'channels' => $this->optional('channels', $property, fn () => $this->channels->fetch($property, $period)),
             'countries' => $this->optional('countries', $property, fn () => $this->countries->fetch($property, $period, $site['sessions'])),
             'country_performance' => $this->optional('country_performance', $property, fn () => $this->countryPerformance->fetch($property, $period)),
+            'top_pages' => $this->optional('top_pages', $property, fn () => $this->pageViews->pages($property, $period)),
+            'top_offers' => $this->optional('top_offers', $property, fn () => $this->pageViews->offers($property, $period)),
             'ai_traffic' => $this->optional('ai_traffic', $property, fn () => $this->aiTraffic->fetch($property, $period)),
             'paid' => $this->optional('paid', $property, fn () => $this->paid->fetch($property, $period)),
             'trend' => $this->optional('trend', $property, fn () => $this->trend->fetch($property, $period)),

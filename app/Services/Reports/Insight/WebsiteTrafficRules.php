@@ -10,6 +10,7 @@ namespace App\Services\Reports\Insight;
  *   overview              sessions, users, average session duration, engagement rate, key events
  *   yearAgo               monthly only: sessions, key events and booking-engine visits against the same month last year
  *   bookingVisits         booking-engine visits (only with a booking definition)
+ *   topOffer              the most visited offer (payload.top_offers), when the hotel has offer pages
  *   growthLowQuality      sessions up while engagement or session duration is down: growth from lower-quality traffic
  *   fewerButBetter        sessions down while engagement is up
  *   bookingNotFollowing   sessions up while booking-engine visits are flat or down
@@ -29,7 +30,7 @@ final class WebsiteTrafficRules
         }
 
         $out = array_filter([$this->overview($c, $site)]);
-        foreach (['bookingVisits', 'yearAgo', 'growthLowQuality', 'fewerButBetter', 'bookingNotFollowing', 'bookingRate', 'purchases'] as $rule) {
+        foreach (['bookingVisits', 'topOffer', 'yearAgo', 'growthLowQuality', 'fewerButBetter', 'bookingNotFollowing', 'bookingRate', 'purchases'] as $rule) {
             $finding = $this->{$rule}($c, $site);
             if ($finding !== null) {
                 $out[] = $finding->withRule($rule);
@@ -65,6 +66,18 @@ final class WebsiteTrafficRules
 
         // The headline already states booking-engine visits, so this is the first sentence to go when space is short.
         return $phrase === null ? null : new Finding("Sessions that reached the booking engine {$phrase}.", weight: 40);
+    }
+
+    public function topOffer(InsightContext $c, array $site): ?Finding
+    {
+        $top = $c->section('top_offers')['rows'][0] ?? null;
+        if (! is_array($top) || (float) ($top['views']['current'] ?? 0) <= 0) {
+            return null;
+        }
+
+        $change = $c->dir($top['views']) === 'guarded' ? '' : ', '.$c->change($top['views']['change']);
+
+        return new Finding('The most visited offer was '.$top['name'].' ('.$c->value('n', $top['views']['current']).' views'.$change.').', weight: 66);
     }
 
     /** Monthly reports: the same month last year. A year-ago change beyond the guard is left to the caution. */

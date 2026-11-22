@@ -149,6 +149,32 @@ final class FakeData
                     $r(['country' => 'Germany', 'sessionCampaignName' => 'spam-run', 'sessionSourceMedium' => 'spam.example / referral'], ['sessions' => 700]),
                 ],
             ],
+            'pages.views' => [
+                'current' => [
+                    $r(['pagePath' => '/'], ['screenPageViews' => 6682, 'totalUsers' => 5262]),
+                    $r(['pagePath' => '/offer/black-friday-limited-time-offer'], ['screenPageViews' => 342, 'totalUsers' => 207]),
+                    $r(['pagePath' => '/holy-river'], ['screenPageViews' => 325, 'totalUsers' => 222]),
+                    $r(['pagePath' => '/offer/last-minute-deal'], ['screenPageViews' => 199, 'totalUsers' => 149]),
+                    $r(['pagePath' => '/experiences/day-pass'], ['screenPageViews' => 176, 'totalUsers' => 124]),
+                    $r(['pagePath' => '/offers'], ['screenPageViews' => 100, 'totalUsers' => 65]),
+                ],
+                'previous' => [
+                    $r(['pagePath' => '/'], ['screenPageViews' => 7000, 'totalUsers' => 5500]),
+                    $r(['pagePath' => '/holy-river'], ['screenPageViews' => 400, 'totalUsers' => 250]),
+                    $r(['pagePath' => '/offer/last-minute-deal'], ['screenPageViews' => 150, 'totalUsers' => 110]),
+                ],
+            ],
+            'offers.views' => [
+                'current' => [
+                    $r(['pagePath' => '/offer/last-minute-deal'], ['screenPageViews' => 199, 'totalUsers' => 149]),
+                    $r(['pagePath' => '/offer/black-friday-limited-time-offer'], ['screenPageViews' => 342, 'totalUsers' => 207]),
+                    $r(['pagePath' => '/offer/your-last-night-is-on-us'], ['screenPageViews' => 29, 'totalUsers' => 22]),
+                ],
+                'previous' => [
+                    $r(['pagePath' => '/offer/last-minute-deal'], ['screenPageViews' => 150, 'totalUsers' => 110]),
+                    $r(['pagePath' => '/offer/early-bird-offer'], ['screenPageViews' => 40, 'totalUsers' => 30]),
+                ],
+            ],
             'ai.sources' => [
                 'current' => array_map(fn ($s, $n) => $r(['sessionSource' => $s], ['sessions' => $n]), ['chatgpt.com', 'perplexity.ai', 'gemini.google.com', 'claude.ai'], [120, 40, 10, 5]),
                 'previous' => array_map(fn ($s, $n) => $r(['sessionSource' => $s], ['sessions' => $n]), ['chatgpt.com', 'perplexity.ai', 'claude.ai'], [80, 20, 6]),
@@ -215,7 +241,7 @@ final class FakeData
      */
     private static function scale(array $fixture, int $factor): array
     {
-        $countKeys = ['sessions', 'totalUsers', 'ecommercePurchases', 'purchaseRevenue', 'totalPurchasers', 'keyEvents', 'engagedSessions', 'eventCount',
+        $countKeys = ['sessions', 'totalUsers', 'ecommercePurchases', 'purchaseRevenue', 'totalPurchasers', 'keyEvents', 'screenPageViews', 'engagedSessions', 'eventCount',
             'advertiserAdImpressions', 'advertiserAdClicks', 'advertiserAdCost', 'clicks', 'impressions'];
 
         $walk = function (mixed $node) use (&$walk, $countKeys, $factor): mixed {

@@ -253,6 +253,34 @@
     {!! $gap(12) !!}
     @endif
 
+    {{-- 5b. Most visited pages and offers --}}
+    @foreach ([['pages', 'Page'], ['offers', 'Offer']] as [$listKey, $listLabel])
+    @if ($view[$listKey])
+    <tr><td bgcolor="#FFFFFF" style="background:#FFFFFF; {{ $card }}">
+        @include('emails.partials.heading', ['title' => $view[$listKey]['title']])
+        @if ($view[$listKey]['unavailable'])
+            @include('emails.partials.unavailable')
+        @else
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><th align="left" style="{{ $th }}">{{ $listLabel }}</th><th align="right" style="{{ $thNum }}">Views</th><th align="right" style="{{ $thNum }}">Users</th><th align="right" style="{{ $thNum }}">Change</th></tr>
+                @foreach ($view[$listKey]['rows'] as $row)
+                    <tr>
+                        <td style="{{ $td }} word-break:break-word;">{{ $row['name'] }}@if ($row['name'] !== $row['path'])<br><span style="{{ $font }} font-size:13px; color:#6B7280;">{{ $row['path'] }}</span>@endif</td>
+                        <td align="right" style="{{ $numB }}">{{ $row['views'] }}</td>
+                        <td align="right" style="{{ $num }}">{{ $row['users'] }}</td>
+                        <td align="right" style="{{ $num }}">@include('emails.partials.change', ['change' => $row['change']])</td>
+                    </tr>
+                @endforeach
+            </table>
+            @if ($listKey === 'offers')
+                {!! $para('All offer pages together: '.$view[$listKey]['total'].' views.', 'font-size:13px; line-height:19px; color:#4B5563;', '8px 0 0 0') !!}
+            @endif
+        @endif
+    </td></tr>
+    {!! $gap(12) !!}
+    @endif
+    @endforeach
+
     {{-- 6. Paid --}}
     @if ($view['paid'])
     <tr><td bgcolor="#FFFFFF" style="background:#FFFFFF; {{ $card }}">

@@ -186,3 +186,10 @@ Visits and booking events come from one GA4 query (`site.booking`); `eventCount`
 "engagement on the booking engine", and note it feeds the quality label and bot flag).
 
 A missing or invalid definition gives null everywhere. It is never read as zero.
+
+## Most visited pages and offers
+
+`top_pages` and `top_offers` (shown after Country performance) each have `total` (page views of all matching pages, a metric) and `rows[]`:
+`{path, name, views (metric, compared with the previous period), users (current period)}`, top 5 by views (`report.top.pages`, `report.top.offers`).
+Offers are the pages under `report.insight.offer_path_prefix` (`/offer/` by default, per hotel under `report.insight.properties.{slug}`; empty =
+no offers section). An offer's `name` is made from its path ("/offer/last-minute-deal" is "Last Minute Deal"). The insight names the most visited offer.

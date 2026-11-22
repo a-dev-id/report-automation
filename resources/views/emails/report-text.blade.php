@@ -85,6 +85,19 @@ This section is temporarily unavailable.
 @endforeach
 @endif
 @endif
+@foreach (['pages', 'offers'] as $listKey)
+@if ($view[$listKey])
+
+{!! strtoupper($view[$listKey]['title']) !!}
+@if ($view[$listKey]['unavailable'])
+This section is temporarily unavailable.
+@else
+@foreach ($view[$listKey]['rows'] as $row)
+ * {!! $row['name'] !!}@if ($row['name'] !== $row['path']) ({!! $row['path'] !!})@endif: {!! $row['views'] !!} views, {!! $row['users'] !!} users ({!! $arrow($row['change']) !!})
+@endforeach
+@endif
+@endif
+@endforeach
 @if ($view['paid'])
 
 PAID ADVERTISING
